@@ -36,39 +36,44 @@ function withinOnePercent(value: number, best: number): boolean {
 
 export function summarizeResults(competitors: Competitor[], results: RunResult[]): SummaryRow[] {
   const rows = competitors.map((competitor) => {
-    const valid = results.filter(
-      (result) => result.competitorId === competitor.id && !result.warmup && result.valid,
+    const measured = results.filter(
+      (result) => result.competitorId === competitor.id && !result.warmup,
     );
+    const valid = measured.filter((result) => result.valid);
+    const summarized = valid.length > 0 ? valid : measured;
     return {
       competitor,
+      measuredRuns: measured.length,
       validRuns: valid.length,
-      promptToFirstOutputMs: median(valid.map((result) => result.metrics.promptToFirstOutputMs)),
-      coldStartToFirstOutputMs: median(valid.map((result) => result.metrics.coldStartToFirstOutputMs)),
-      promptToFinishMs: median(valid.map((result) => result.metrics.promptToFinishMs)),
-      visibleTokensPerSecond: median(valid.map((result) => result.metrics.visibleTokensPerSecond)),
+      anomalousRuns: measured.length - valid.length,
+      disqualified: valid.length === 0,
+      promptToFirstOutputMs: median(summarized.map((result) => result.metrics.promptToFirstOutputMs)),
+      coldStartToFirstOutputMs: median(summarized.map((result) => result.metrics.coldStartToFirstOutputMs)),
+      promptToFinishMs: median(summarized.map((result) => result.metrics.promptToFinishMs)),
+      visibleTokensPerSecond: median(summarized.map((result) => result.metrics.visibleTokensPerSecond)),
       finishRank: 0,
       crowns: [] as SummaryRow["crowns"],
     };
-  }).filter((row) => row.validRuns > 0);
+  }).filter((row) => row.measuredRuns > 0);
 
   if (rows.length === 0) return [];
 
-  const ranked = [...rows].sort((a, b) => a.promptToFinishMs - b.promptToFinishMs);
+  const ranked = rows.filter((row) => !row.disqualified).sort((a, b) => a.promptToFinishMs - b.promptToFinishMs);
   ranked.forEach((row, index) => {
     row.finishRank = index + 1;
   });
 
-  const bestFinish = Math.min(...rows.map((row) => row.promptToFinishMs));
-  const bestFirstOutput = Math.min(...rows.map((row) => row.promptToFirstOutputMs));
-  const bestColdStart = Math.min(...rows.map((row) => row.coldStartToFirstOutputMs));
-  const bestVisibleSpeed = Math.max(...rows.map((row) => (Number.isFinite(row.visibleTokensPerSecond) ? row.visibleTokensPerSecond : 0)));
+  const bestFinish = Math.min(...ranked.map((row) => row.promptToFinishMs));
+  const bestFirstOutput = Math.min(...ranked.map((row) => row.promptToFirstOutputMs));
+  const bestColdStart = Math.min(...ranked.map((row) => row.coldStartToFirstOutputMs));
+  const bestVisibleSpeed = Math.max(...ranked.map((row) => (Number.isFinite(row.visibleTokensPerSecond) ? row.visibleTokensPerSecond : 0)));
 
-  for (const row of rows) {
+  for (const row of ranked) {
     if (withinOnePercent(row.promptToFinishMs, bestFinish)) row.crowns.push("finish");
     if (withinOnePercent(row.promptToFirstOutputMs, bestFirstOutput)) row.crowns.push("firstOutput");
     if (withinOnePercent(row.coldStartToFirstOutputMs, bestColdStart)) row.crowns.push("coldStart");
     if (withinOnePercent(row.visibleTokensPerSecond, bestVisibleSpeed)) row.crowns.push("visibleSpeed");
   }
 
-  return rows.sort((a, b) => a.finishRank - b.finishRank);
+  return rows.sort((a, b) => Number(a.disqualified) - Number(b.disqualified) || a.finishRank - b.finishRank);
 }

@@ -74,9 +74,36 @@ describe("metrics", () => {
     ]);
 
     expect(summary[0].competitor.id).toBe("a");
+    expect(summary[0].measuredRuns).toBe(2);
     expect(summary[0].validRuns).toBe(1);
-    expect(summary[0].normalizedTps).toBe(70);
-    expect(summary[0].crowns).not.toContain("tps");
-    expect(summary[1].crowns).toContain("tps");
+    expect(summary[0].anomalousRuns).toBe(1);
+    expect(summary[0].disqualified).toBe(false);
+    expect(summary[0].visibleTokensPerSecond).toBe(70);
+    expect(summary[0].crowns).not.toContain("visibleSpeed");
+    expect(summary[1].crowns).toContain("visibleSpeed");
+  });
+
+  it("keeps fully anomalous racers in the results as disqualified", () => {
+    const anomalous = result("a", 500, 55_114);
+    anomalous.valid = false;
+    anomalous.validationMessage = "Buffered burst";
+
+    const summary = summarizeResults(competitors, [
+      anomalous,
+      result("b", 750, 90),
+    ]);
+
+    expect(summary.map((row) => row.competitor.id)).toEqual(["b", "a"]);
+    expect(summary[0].finishRank).toBe(1);
+    expect(summary[1]).toMatchObject({
+      measuredRuns: 1,
+      validRuns: 0,
+      anomalousRuns: 1,
+      disqualified: true,
+      finishRank: 0,
+      promptToFinishMs: 500,
+      visibleTokensPerSecond: 55_114,
+      crowns: [],
+    });
   });
 });

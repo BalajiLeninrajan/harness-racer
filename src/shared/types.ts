@@ -74,7 +74,10 @@ export interface RunResult {
 
 export interface SummaryRow {
   competitor: Competitor;
+  measuredRuns: number;
   validRuns: number;
+  anomalousRuns: number;
+  disqualified: boolean;
   promptToFirstOutputMs: number;
   coldStartToFirstOutputMs: number;
   promptToFinishMs: number;

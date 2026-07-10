@@ -78,6 +78,14 @@ describe("benchmark engine", () => {
     expect(completed.results).toHaveLength(2);
     expect(completed.results.every((result) => !result.valid)).toBe(true);
     expect(completed.results.every((result) => result.validationMessage?.includes("burst"))).toBe(true);
-    expect(completed.summary).toEqual([]);
+    expect(completed.summary).toHaveLength(1);
+    expect(completed.summary[0]).toMatchObject({
+      measuredRuns: 2,
+      validRuns: 0,
+      anomalousRuns: 2,
+      disqualified: true,
+      finishRank: 0,
+      crowns: [],
+    });
   });
 });
