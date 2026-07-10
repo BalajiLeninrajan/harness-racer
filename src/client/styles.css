@@ -662,17 +662,16 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
   justify-self: start;
   grid-template-columns: minmax(0, 1fr) 34px;
   grid-template-rows: auto;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
-  padding: 13px 0;
-  border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--surface-1) 44%, transparent);
-  border-radius: 0;
-  background: transparent;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--lane-color) 26%, var(--surface-1));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--lane-color) 3%, transparent);
   box-shadow: none;
 }
 .competitor-card:nth-of-type(even) { justify-self: end; }
-.competitor-card::before { inset: 17px auto 17px -10px; width: 2px; box-shadow: none; }
+.competitor-card::before { inset: -1px auto -1px -1px; width: 3px; border-radius: 5px 0 0 5px; box-shadow: none; }
 .remove-button { grid-column: 2; grid-row: 1; align-self: center; }
 .add-competitor {
   width: min(36%, 320px);
@@ -703,6 +702,8 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
   transition: border-color .16s, background .16s;
 }
 .racer-picker-trigger:hover, .racer-picker.open .racer-picker-trigger { border-color: color-mix(in srgb, var(--mauve) 64%, var(--surface-1)); background: var(--base); }
+.competitor-card .racer-picker-trigger { border: 0; border-radius: 3px; background: transparent; }
+.competitor-card .racer-picker-trigger:hover, .competitor-card .racer-picker.open .racer-picker-trigger { background: color-mix(in srgb, var(--surface-0) 34%, transparent); }
 .racer-picker-trigger > svg { color: var(--overlay-1); transition: transform .16s; }
 .racer-picker.open .racer-picker-trigger > svg { transform: rotate(180deg); }
 .racer-picker-logo, .racer-option-logo { width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--surface-2) 42%, transparent); border-radius: 9px; background: var(--base); }
