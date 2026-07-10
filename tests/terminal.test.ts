@@ -7,16 +7,17 @@ import type {
   RunResult,
   ServerEvent,
   SummaryRow,
-} from "./shared/types.js";
-import type { HarnessAdapter } from "./server/adapters/types.js";
+} from "../src/shared/types.js";
+import type { HarnessAdapter } from "../src/server/adapters/types.js";
 import {
   collectBenchmarkRequest,
   createTerminalEventRenderer,
+  renderRankedSummary,
   runTerminalMode,
   type RunnableAdapter,
   type TerminalQuestioner,
   type TerminalWriter,
-} from "./terminal.js";
+} from "../src/terminal.js";
 
 class ScriptedQuestioner implements TerminalQuestioner {
   readonly prompts: string[] = [];
@@ -73,9 +74,6 @@ function adapterFor(info: ProviderInfo, onProbe?: () => void): HarnessAdapter {
       onProbe?.();
       return info;
     },
-    async listModels() {
-      return info.models;
-    },
     async run() {
       return {};
     },
@@ -91,14 +89,14 @@ function result(competitorId: string): RunResult {
     output: "visible benchmark output",
     valid: true,
     metrics: {
-      setupMs: 20,
-      modelTtftMs: 120,
-      coldTtftMs: 140,
-      streamMs: 1_000,
-      totalMs: 1_120,
-      normalizedTokens: 50,
-      normalizedTps: 50,
-      deltaCount: 2,
+      harnessPrepMs: 20,
+      promptToFirstOutputMs: 120,
+      coldStartToFirstOutputMs: 140,
+      visibleStreamMs: 1_000,
+      promptToFinishMs: 1_120,
+      visibleTokens: 50,
+      visibleTokensPerSecond: 50,
+      streamChunkCount: 2,
     },
   };
 }
@@ -139,6 +137,45 @@ describe("terminal wizard", () => {
 });
 
 describe("terminal event rendering", () => {
+  it("lists disqualified racers after eligible finishers without assigning place zero", () => {
+    const competitors = [
+      { id: "a", harness: "codex" as const, model: "fast", label: "Codex / Fast", color: "#fff" },
+      { id: "b", harness: "cursor" as const, model: "balanced", label: "Cursor / Balanced", color: "#000" },
+    ];
+    const eligible: SummaryRow = {
+      competitor: competitors[1],
+      measuredRuns: 2,
+      validRuns: 2,
+      anomalousRuns: 0,
+      disqualified: false,
+      promptToFirstOutputMs: 90,
+      coldStartToFirstOutputMs: 110,
+      promptToFinishMs: 900,
+      visibleTokensPerSecond: 72.4,
+      finishRank: 1,
+      crowns: ["finish"],
+    };
+    const disqualified: SummaryRow = {
+      competitor: competitors[0],
+      measuredRuns: 2,
+      validRuns: 0,
+      anomalousRuns: 2,
+      disqualified: true,
+      promptToFirstOutputMs: 120,
+      coldStartToFirstOutputMs: 140,
+      promptToFinishMs: 1_120,
+      visibleTokensPerSecond: 50,
+      finishRank: 0,
+      crowns: [],
+    };
+
+    const output = renderRankedSummary([disqualified, eligible]);
+    expect(output.indexOf("#1 Cursor / Balanced")).toBeLessThan(output.indexOf("DSQ Codex / Fast"));
+    expect(output).toContain("0/2 valid, 2 anomalous runs");
+    expect(output).not.toContain("#0");
+    expect(renderRankedSummary([disqualified])).toContain("no eligible finishers");
+  });
+
   it("omits streamed delta payloads and renders ranked final metrics", () => {
     const competitors = [
       { id: "a", harness: "codex" as const, model: "fast", label: "Codex / Fast", color: "#fff" },
@@ -150,22 +187,28 @@ describe("terminal event rendering", () => {
     const summary: SummaryRow[] = [
       {
         competitor: competitors[1],
+        measuredRuns: 2,
         validRuns: 2,
-        modelTtftMs: 90,
-        coldTtftMs: 110,
-        totalMs: 900,
-        normalizedTps: 72.4,
-        overallRank: 1,
-        crowns: ["overall", "tps"],
+        anomalousRuns: 0,
+        disqualified: false,
+        promptToFirstOutputMs: 90,
+        coldStartToFirstOutputMs: 110,
+        promptToFinishMs: 900,
+        visibleTokensPerSecond: 72.4,
+        finishRank: 1,
+        crowns: ["finish", "visibleSpeed"],
       },
       {
         competitor: competitors[0],
+        measuredRuns: 2,
         validRuns: 2,
-        modelTtftMs: 120,
-        coldTtftMs: 140,
-        totalMs: 1_120,
-        normalizedTps: 50,
-        overallRank: 2,
+        anomalousRuns: 0,
+        disqualified: false,
+        promptToFirstOutputMs: 120,
+        coldStartToFirstOutputMs: 140,
+        promptToFinishMs: 1_120,
+        visibleTokensPerSecond: 50,
+        finishRank: 2,
         crowns: [],
       },
     ];
@@ -189,7 +232,7 @@ describe("terminal event rendering", () => {
     expect(writer.text).toContain("[1/2] Codex / Fast");
     expect(writer.text).toContain("#1 Cursor / Balanced");
     expect(writer.text).toContain("90ms");
-    expect(writer.text).toContain("72.4 TPS");
+    expect(writer.text).toContain("72.4 visible tok/s");
     expect(writer.text.indexOf("#1 Cursor")).toBeLessThan(writer.text.indexOf("#2 Codex"));
   });
 

@@ -16,10 +16,25 @@ const help = `TPS Racer
 Usage: tps-racer [options]
 
 Options:
-  --cli          Run the benchmark entirely in the terminal
+  --cli          Open the interactive terminal UI
   --no-open      Start the browser app without opening it automatically
   --port <port>  Set the browser app's loopback port (default: 4317)
   -h, --help     Show this help
+
+Terminal UI:
+  ↑/↓ or j/k     Move between racers or choices
+  ←/→ or h/l     Change the selected harness
+  Space          Choose a model or select a filtered choice
+  Enter          Continue, start the race, or finish
+  A / D          Add or remove a racer
+  M / P          Cycle run mode or sample preset
+  R / E          Race again or edit the finished grid
+  Q / Esc        Leave the current screen
+  Ctrl-C         Stop immediately and clean up
+
+Examples:
+  tps-racer --cli
+  tps-racer --no-open --port 4317
 `;
 
 async function main(): Promise<void> {

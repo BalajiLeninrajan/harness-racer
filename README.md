@@ -19,7 +19,9 @@ Pass `--cli` to run the same benchmark without starting a local web server or op
 pnpm benchmark -- --cli
 ```
 
-The terminal flow scans the same local harnesses, lets you choose two to six racers and their models, then asks for the starting mode and sample preset. During the race it prints each heat's progress and finishes with the same median TTFT, cold TTFT, normalized TPS, and total-time ranking as the dashboard.
+On an interactive terminal, this opens a full-screen keyboard-driven UI with an editable starting grid, searchable model picker, tmux-style live output panes for every racer, and a detailed final classification with winner gaps, per-workload timing, validity, and failure diagnostics. Use the arrow keys to move, `Space` to choose models, `A`/`D` to add or remove lanes, `M`/`P` to change race settings, and `Enter` to start.
+
+Piped or non-interactive environments retain a plain-text fallback. Both interfaces use the same benchmark engine and report median prompt-to-first-output, cold-start-to-first-output, visible-token speed, and prompt-to-finish ranking just like the browser dashboard.
 
 Once published, the equivalent zero-install command is:
 

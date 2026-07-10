@@ -43,6 +43,7 @@ export interface TerminalModeOptions {
   output?: TerminalWriter;
   signal?: AbortSignal;
   handleSigint?: boolean;
+  ui?: "auto" | "tui" | "line";
 }
 
 export type TerminalModeResult = "completed" | "cancelled" | "declined" | "unavailable";
@@ -265,12 +266,19 @@ export function formatTps(value: number): string {
 }
 
 export function renderRankedSummary(summary: readonly SummaryRow[]): string {
-  if (summary.length === 0) return "\nNo valid measured runs were completed.\n";
-  const ranked = [...summary].sort((left, right) => left.overallRank - right.overallRank);
-  const lines = ranked.map((row) =>
-    `  #${row.overallRank} ${row.competitor.label} — TTFT ${formatMilliseconds(row.modelTtftMs)}, cold ${formatMilliseconds(row.coldTtftMs)}, ${formatTps(row.normalizedTps)} TPS, total ${formatMilliseconds(row.totalMs)} (${row.validRuns} valid)`,
+  if (summary.length === 0) return "\nNo measured runs were completed.\n";
+  const ranked = [...summary].sort((left, right) =>
+    Number(left.disqualified) - Number(right.disqualified) || left.finishRank - right.finishRank
   );
-  return `\nFinal ranking\n${lines.join("\n")}\n`;
+  const lines = ranked.map((row) => {
+    const place = row.disqualified ? "DSQ" : `#${row.finishRank}`;
+    const anomaly = row.anomalousRuns > 0
+      ? `, ${row.anomalousRuns} anomalous ${row.anomalousRuns === 1 ? "run" : "runs"}`
+      : "";
+    return `  ${place} ${row.competitor.label} — first output ${formatMilliseconds(row.promptToFirstOutputMs)}, cold start ${formatMilliseconds(row.coldStartToFirstOutputMs)}, ${formatTps(row.visibleTokensPerSecond)} visible tok/s, finish ${formatMilliseconds(row.promptToFinishMs)} (${row.validRuns}/${row.measuredRuns} valid${anomaly})`;
+  });
+  const eligibility = ranked.some((row) => !row.disqualified) ? "" : " — no eligible finishers";
+  return `\nFinal classification${eligibility}\n${lines.join("\n")}\n`;
 }
 
 export function createTerminalEventRenderer(
@@ -306,9 +314,9 @@ export function createTerminalEventRenderer(
       const result = event.result;
       const label = labels.get(result.competitorId) ?? result.competitorId;
       const heat = result.warmup ? "warmup" : `sample ${result.sample}`;
-      const validity = result.valid ? "" : ` — invalid: ${result.validationMessage ?? "validation failed"}`;
+      const validity = result.valid ? "" : ` — anomaly: ${result.validationMessage ?? "streaming measurement failed"}`;
       writer.write(
-        `  [${completedRuns}/${totalRuns || "?"}] ${label} · ${result.workload} ${heat} — ${formatMilliseconds(result.metrics.modelTtftMs)} TTFT, ${formatTps(result.metrics.normalizedTps)} TPS${validity}\n`,
+        `  [${completedRuns}/${totalRuns || "?"}] ${label} · ${result.workload} ${heat} — ${formatMilliseconds(result.metrics.promptToFirstOutputMs)} first output, ${formatTps(result.metrics.visibleTokensPerSecond)} visible tok/s${validity}\n`,
       );
       return;
     }
@@ -341,6 +349,24 @@ export async function runTerminalMode(options: TerminalModeOptions = {}): Promis
   const adapterList = [...(options.adapters ?? defaultAdapters)];
   const benchmark = options.runBenchmark ?? defaultRunBenchmark;
   const writer = options.output ?? stdout;
+  const input = options.input ?? stdin;
+
+  if (!options.questioner && options.ui !== "line") {
+    const { runTerminalTui, supportsTerminalTui } = await import("./tui/index.js");
+    const useTui = options.ui === "tui" || supportsTerminalTui(input, writer);
+    if (useTui) {
+      return runTerminalTui({
+        adapters: adapterList,
+        runBenchmark: benchmark,
+        probeAdapters,
+        input,
+        output: writer,
+        signal: options.signal,
+        handleSigint: options.handleSigint,
+      });
+    }
+  }
+
   let questioner = options.questioner;
   let questionerClosed = false;
   const controller = new AbortController();
@@ -380,7 +406,7 @@ export async function runTerminalMode(options: TerminalModeOptions = {}): Promis
 
     if (!questioner) {
       questioner = createInterface({
-        input: options.input ?? stdin,
+        input,
         output: writer as NodeJS.WritableStream,
       });
       attachQuestionerSignal();
