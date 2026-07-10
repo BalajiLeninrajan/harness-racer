@@ -1,5 +1,6 @@
-import { Check, Pencil, Search } from "lucide-react";
+import { Check, Pencil, Search, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 
 import type { HarnessId, ModelOption, ProviderInfo } from "../shared/types";
 import { HarnessLogo, ModelLabLogo, modelLabName } from "./BrandLogo";
@@ -43,7 +44,8 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
   const [highlighted, setHighlighted] = useState(0);
   const [activeHarness, setActiveHarness] = useState<HarnessId>(harness);
   const listboxId = useId();
-  const rootRef = useRef<HTMLDivElement>(null);
+  const dialogId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -72,11 +74,9 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
     setActiveHarness(harness);
     setHighlighted(Math.max(0, choices.filter((choice) => choice.provider.id === harness).findIndex((choice) => choice.model.id === model)));
     window.requestAnimationFrame(() => searchRef.current?.focus());
-    const close = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
   }, [choices, harness, model, open]);
 
   useEffect(() => {
@@ -115,13 +115,24 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
     }
   }
 
+  function trapDialogFocus(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]):not([tabindex='-1']), input:not([disabled]):not([tabindex='-1'])") ?? []);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first || !last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   return (
     <div
       className={`racer-picker ${open ? "open" : ""}`}
-      ref={rootRef}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
-      }}
       onKeyDown={(event) => {
         if (open && event.key === "Escape") {
           event.preventDefault();
@@ -133,10 +144,10 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
         ref={triggerRef}
         type="button"
         className="racer-picker-trigger"
-        aria-haspopup="listbox"
+        aria-haspopup="dialog"
         aria-expanded={open}
-        aria-controls={open ? listboxId : undefined}
-        onClick={() => setOpen((current) => !current)}
+        aria-controls={open ? dialogId : undefined}
+        onClick={() => open ? closeAndFocus() : setOpen(true)}
       >
         <span className="racer-picker-logo" aria-hidden="true">
           <ModelLabLogo model={selected?.model.id ?? model} harness={selected?.provider.id ?? harness} size={22} />
@@ -148,77 +159,90 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
         <Pencil className="racer-picker-cue" size={15} />
       </button>
 
-      {open && (
-        <div className="racer-picker-popover">
-          <aside className="racer-picker-sidebar" aria-label="Harnesses">
-            {providers.map((provider) => (
-              <button
-                type="button"
-                className={provider.id === activeHarness ? "active" : ""}
-                aria-pressed={provider.id === activeHarness}
-                aria-label={provider.name}
-                title={provider.name}
-                key={provider.id}
-                onClick={() => {
-                  setActiveHarness(provider.id);
-                  setQuery("");
-                  setHighlighted(0);
-                  window.requestAnimationFrame(() => searchRef.current?.focus());
-                }}
-              >
-                <HarnessLogo harness={provider.id} size={19} />
-              </button>
-            ))}
-          </aside>
-          <div className="racer-picker-search">
-            <Search size={15} />
-            <input
-              ref={searchRef}
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setHighlighted(0);
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="Search models"
-              aria-label="Search models"
-              aria-autocomplete="list"
-              role="combobox"
-              aria-controls={listboxId}
-              aria-expanded="true"
-              aria-activedescendant={filtered[highlighted] ? `${listboxId}-${highlighted}` : undefined}
-            />
-          </div>
-          <div className="racer-picker-options" id={listboxId} role="listbox" aria-label={`${activeProvider?.name ?? "Harness"} models`}>
-            <div className="racer-picker-pane-label" role="presentation" aria-hidden="true">
-              {activeProvider && <><HarnessLogo harness={activeProvider.id} size={14} /><strong>{activeProvider.name}</strong></>}
-              <span>{filtered.length} model{filtered.length === 1 ? "" : "s"}</span>
-            </div>
-            {filtered.map((choice, index) => {
-              const isSelected = choice.provider.id === harness && choice.model.id === model;
-              return (
+      {open && createPortal(
+        <div className="racer-picker-layer">
+          <div className="racer-picker-backdrop" aria-hidden="true" onPointerDown={closeAndFocus} />
+          <div
+            ref={dialogRef}
+            id={dialogId}
+            className="racer-picker-popover"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose a model"
+            onKeyDown={trapDialogFocus}
+          >
+            <aside className="racer-picker-sidebar" aria-label="Harnesses">
+              {providers.map((provider) => (
                 <button
                   type="button"
-                  id={`${listboxId}-${index}`}
-                  role="option"
-                  aria-selected={isSelected}
-                  tabIndex={-1}
-                  className={`racer-picker-option ${index === highlighted ? "highlighted" : ""}`}
-                  key={choiceKey(choice)}
-                  ref={(element) => { optionRefs.current[index] = element; }}
-                  onPointerMove={() => setHighlighted(index)}
-                  onClick={() => choose(choice)}
+                  className={provider.id === activeHarness ? "active" : ""}
+                  aria-pressed={provider.id === activeHarness}
+                  aria-label={provider.name}
+                  title={provider.name}
+                  key={provider.id}
+                  onClick={() => {
+                    setActiveHarness(provider.id);
+                    setQuery("");
+                    setHighlighted(0);
+                    window.requestAnimationFrame(() => searchRef.current?.focus());
+                  }}
                 >
-                  <span className="racer-option-logo" aria-hidden="true"><ModelLabLogo model={choice.model.id} harness={choice.provider.id} size={18} /></span>
-                  <span><strong>{choice.model.label}</strong><small>{modelLabName(choice.model.id, choice.provider.id)} · {choice.model.id}</small></span>
-                  {choice.model.isDefault && <em>DEFAULT</em>}
-                  <Check className={isSelected ? "selected" : ""} size={15} />
+                  <HarnessLogo harness={provider.id} size={19} />
                 </button>
-              );
-            })}
-            {!filtered.length && <div className="racer-picker-empty">No matching models</div>}
+              ))}
+            </aside>
+            <div className="racer-picker-search">
+              <Search size={15} />
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setHighlighted(0);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Search models"
+                aria-label="Search models"
+                aria-autocomplete="list"
+                role="combobox"
+                aria-controls={listboxId}
+                aria-expanded="true"
+                aria-activedescendant={filtered[highlighted] ? `${listboxId}-${highlighted}` : undefined}
+              />
+              <button type="button" className="racer-picker-close" aria-label="Close model picker" onClick={closeAndFocus}><X size={16} /></button>
+            </div>
+            <div className="racer-picker-options" id={listboxId} role="listbox" aria-label={`${activeProvider?.name ?? "Harness"} models`}>
+              <div className="racer-picker-pane-label" role="presentation" aria-hidden="true">
+                {activeProvider && <><HarnessLogo harness={activeProvider.id} size={14} /><strong>{activeProvider.name}</strong></>}
+                <span>{filtered.length} model{filtered.length === 1 ? "" : "s"}</span>
+              </div>
+              {filtered.map((choice, index) => {
+                const isSelected = choice.provider.id === harness && choice.model.id === model;
+                return (
+                  <button
+                    type="button"
+                    id={`${listboxId}-${index}`}
+                    role="option"
+                    aria-selected={isSelected}
+                    tabIndex={-1}
+                    className={`racer-picker-option ${index === highlighted ? "highlighted" : ""}`}
+                    key={choiceKey(choice)}
+                    ref={(element) => { optionRefs.current[index] = element; }}
+                    onPointerMove={() => setHighlighted(index)}
+                    onClick={() => choose(choice)}
+                  >
+                    <span className="racer-option-logo" aria-hidden="true"><ModelLabLogo model={choice.model.id} harness={choice.provider.id} size={18} /></span>
+                    <span><strong>{choice.model.label}</strong><small>{modelLabName(choice.model.id, choice.provider.id)} · {choice.model.id}</small></span>
+                    {choice.model.isDefault && <em>DEFAULT</em>}
+                    <Check className={isSelected ? "selected" : ""} size={15} />
+                  </button>
+                );
+              })}
+              {!filtered.length && <div className="racer-picker-empty">No matching models</div>}
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

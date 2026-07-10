@@ -43,7 +43,7 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; scrollbar-gutter: stable; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--crust); }
 button, input, select { font: inherit; }
 button { color: inherit; }
@@ -635,38 +635,30 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
   background: transparent;
   box-shadow: none;
 }
-.setup-view { width: min(1040px, 100%); padding-top: clamp(28px, 4vw, 46px); }
-.hero { width: min(640px, 100%); display: block; margin: 0 auto 22px; }
-.hero .eyebrow, .hero h1, .hero > p { display: flex; }
-.hero .eyebrow { margin-bottom: 10px; }
-.hero h1 { margin-top: 0; font-size: clamp(34px, 4.4vw, 50px); line-height: 1; letter-spacing: -.05em; }
-.hero > p { max-width: 560px; margin: 10px 0 16px; color: var(--subtext-1); font-size: 14px; line-height: 1.5; }
-.race-stripe { width: min(430px, 100%); height: 16px; display: flex; align-items: center; gap: 10px; color: var(--overlay-1); font: 700 9px/1 var(--mono); letter-spacing: .14em; }
-.race-stripe::before { content: ""; width: 34px; height: 16px; flex: 0 0 auto; border-radius: 3px; background: conic-gradient(from 90deg, var(--surface-2) 25%, transparent 0 50%, var(--surface-2) 0 75%, transparent 0) 0 0 / 8px 8px; }
-.race-stripe i { height: 2px; flex: 1; border-radius: 99px; background: linear-gradient(90deg, var(--mauve), color-mix(in srgb, var(--mauve) 22%, var(--surface-1)), transparent); }
-
-.setup-panel.panel {
-  width: min(640px, 100%);
-  margin-inline: auto;
-  border: 0;
-  border-top: 1px solid color-mix(in srgb, var(--surface-2) 42%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--surface-2) 42%, transparent);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+.setup-view { width: min(740px, 100%); margin: 0 auto; padding: clamp(38px, 6vw, 68px) 0 100px; }
+.setup-workbench.panel {
+  overflow: visible;
+  border: 1px solid color-mix(in srgb, var(--surface-1) 42%, transparent);
+  border-radius: 20px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--surface-0) 14%, var(--base)), var(--base) 58%);
+  box-shadow: 12px 14px 30px rgb(11 11 19 / .42), -5px -5px 14px var(--neu-light-soft), inset 1px 1px color-mix(in srgb, var(--surface-2) 22%, transparent);
 }
-.setup-panel .panel-heading { width: 100%; min-height: 52px; margin-inline: auto; padding: 8px 0; }
-.setup-panel .step { width: 25px; height: 25px; border-radius: 7px; box-shadow: none; }
-.setup-panel .panel-heading h2 { font-size: 15px; }
+.setup-intro { padding: 23px 26px 18px; display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; }
+.setup-intro .eyebrow { margin-bottom: 10px; }
+.setup-intro h1 { margin: 0; font-size: clamp(31px, 4vw, 40px); line-height: 1; letter-spacing: -.045em; }
+.setup-count { flex: 0 0 auto; margin-top: 1px; color: var(--text); font: 750 13px/1 var(--mono); }
+.setup-count small { color: var(--overlay-1); font: inherit; }
+.setup-content { padding: 0 26px; }
 .competitor-list {
   width: 100%;
   margin-inline: auto;
   grid-template-columns: 1fr;
   gap: 0;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--surface-2) 42%, transparent);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--mantle) 20%, transparent);
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--surface-1) 38%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--crust) 54%, var(--mantle));
+  box-shadow: inset 4px 4px 10px rgb(11 11 19 / .46), inset -2px -2px 7px rgb(69 71 90 / .13);
 }
 .competitor-card {
   width: 100%;
@@ -675,9 +667,10 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
   grid-template-rows: auto;
   gap: 8px;
   align-items: center;
-  padding: 7px 10px;
+  min-height: 68px;
+  padding: 5px 6px 5px 10px;
   border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--surface-1) 58%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--surface-0) 72%, transparent);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -685,8 +678,8 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
 }
 .competitor-card:has(.remove-button.is-hidden) { grid-template-columns: minmax(0, 1fr) 0; gap: 0; }
 .competitor-card:last-of-type { border-bottom: 0; }
-.competitor-list:has(.add-competitor) .competitor-card:last-of-type { border-bottom: 1px solid color-mix(in srgb, var(--surface-1) 58%, transparent); }
-.competitor-card::before { inset: 10px auto 10px -1px; width: 3px; border-radius: 0 4px 4px 0; box-shadow: none; }
+.competitor-list:has(.add-competitor) .competitor-card:last-of-type { border-bottom: 1px solid color-mix(in srgb, var(--surface-0) 72%, transparent); }
+.competitor-card::before { inset: 15px auto 15px 0; width: 3px; border-radius: 3px; box-shadow: none; }
 .remove-button {
   grid-column: 2;
   grid-row: 1;
@@ -708,17 +701,24 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
   pointer-events: none;
   transition: width .22s ease, opacity .14s ease, transform .22s ease, visibility 0s linear .22s;
 }
-.add-competitor {
-  width: 100%;
-  justify-self: stretch;
-  min-height: 54px;
-  margin: 0;
-  border: 0;
-  border-radius: 0 0 6px 6px;
-  background: transparent;
-  box-shadow: none;
+@starting-style {
+  .remove-button:not(.is-hidden) { opacity: 0; transform: translateX(8px) scale(.72); }
 }
-.add-competitor:hover { box-shadow: none; }
+.add-competitor {
+  width: calc(100% - 12px);
+  justify-self: center;
+  min-height: 46px;
+  margin: 6px;
+  border: 1px solid color-mix(in srgb, var(--surface-1) 38%, transparent);
+  border-radius: 10px;
+  background: var(--base);
+  box-shadow: 3px 3px 7px rgb(11 11 19 / .4), -1px -1px 4px rgb(69 71 90 / .12), inset 1px 1px rgb(255 255 255 / .035);
+}
+.setup-content .inline-warning { margin-top: 12px; border: 1px solid color-mix(in srgb, var(--peach) 25%, var(--surface-0)); border-radius: 10px; box-shadow: var(--neu-inset-soft); }
+.setup-content > .empty-state { min-height: 260px; }
+.setup-actions { padding: 18px 26px 26px; }
+.setup-actions .primary-button { width: 100%; min-height: 50px; border-radius: 12px; box-shadow: 4px 5px 11px rgb(11 11 19 / .48), -2px -2px 6px rgb(69 71 90 / .1), inset 1px 1px rgb(255 255 255 / .16); }
+.setup-actions .primary-button:disabled { transform: none; box-shadow: inset 3px 3px 7px rgb(11 11 19 / .38), inset -1px -1px 4px rgb(69 71 90 / .08); }
 
 .racer-picker { min-width: 0; position: relative; }
 .racer-picker-trigger {
@@ -737,27 +737,34 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
   transition: border-color .16s, background .16s;
 }
 .racer-picker-trigger:hover, .racer-picker.open .racer-picker-trigger { border-color: color-mix(in srgb, var(--mauve) 64%, var(--surface-1)); background: var(--base); }
-.competitor-card .racer-picker-trigger { border: 0; border-radius: 3px; background: transparent; }
-.competitor-card .racer-picker-trigger:hover, .competitor-card .racer-picker.open .racer-picker-trigger { background: color-mix(in srgb, var(--surface-0) 34%, transparent); }
+.competitor-card .racer-picker-trigger { min-height: 56px; border: 0; border-radius: 10px; background: transparent; box-shadow: none; transition: background .16s, box-shadow .16s, transform .16s; }
+.competitor-card .racer-picker-trigger:hover, .competitor-card .racer-picker.open .racer-picker-trigger { background: var(--base); box-shadow: 3px 3px 7px rgb(11 11 19 / .4), -1px -1px 4px rgb(69 71 90 / .12), inset 1px 1px rgb(255 255 255 / .035); transform: translateY(-1px); }
+.competitor-card .racer-picker-trigger:active { transform: translateY(1px); box-shadow: var(--neu-inset-soft); }
 .racer-picker-cue { color: var(--overlay-1); transition: color .16s; }
 .racer-picker.open .racer-picker-cue { color: var(--mauve); }
 .racer-picker-logo, .racer-option-logo { width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--surface-2) 42%, transparent); border-radius: 9px; background: var(--base); }
+.competitor-card .racer-picker-logo { box-shadow: var(--neu-inset-soft); }
 .racer-option-logo { width: 32px; height: 32px; border-radius: 8px; }
 .racer-picker-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 5px; }
 .racer-picker-copy strong, .racer-picker-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .racer-picker-copy strong { font-size: 14px; }
 .racer-picker-copy small { color: var(--overlay-2); font: 550 10px/1 var(--mono); }
-.racer-picker-popover { position: fixed; z-index: 100; top: 50%; left: 50%; width: min(720px, calc(100vw - 40px)); height: min(70dvh, 560px); display: grid; grid-template-columns: 68px minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr); overflow: hidden; transform: translate(-50%, -50%); border: 1px solid var(--surface-1); border-radius: 13px; background: var(--base); box-shadow: 0 24px 70px rgb(17 17 27 / .82); }
+.racer-picker-layer { position: fixed; z-index: 99; inset: 0; }
+.racer-picker-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; background: rgb(17 17 27 / .56); backdrop-filter: blur(2px); box-shadow: none; cursor: default; }
+.racer-picker-popover { position: fixed; z-index: 100; top: 50%; left: 50%; width: min(720px, calc(100vw - 40px)); height: min(70dvh, 560px); display: grid; grid-template-columns: 68px minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr); overflow: hidden; transform: translate(-50%, -50%); border: 1px solid var(--surface-1); border-radius: 15px; background: var(--base); box-shadow: 14px 18px 46px rgb(11 11 19 / .72), -4px -4px 12px rgb(69 71 90 / .1), inset 1px 1px rgb(255 255 255 / .04); }
 .racer-picker-sidebar { grid-column: 1; grid-row: 1 / 3; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 5px; border-right: 1px solid var(--surface-0); background: color-mix(in srgb, var(--mantle) 48%, var(--base)); }
 .racer-picker-sidebar button { width: 44px; height: 44px; display: grid; place-items: center; position: relative; color: var(--overlay-1); border: 0; border-radius: 9px; background: transparent; cursor: pointer; }
 .racer-picker-sidebar button:hover { color: var(--text); background: color-mix(in srgb, var(--surface-0) 72%, transparent); }
 .racer-picker-sidebar button.active { color: var(--text); background: var(--surface-0); }
 .racer-picker-sidebar button.active::after { content: ""; position: absolute; inset: 8px auto 8px -8px; width: 3px; border-radius: 0 4px 4px 0; background: var(--mauve); }
 .racer-picker-search { grid-column: 2; grid-row: 1; padding: 0 14px; display: flex; align-items: center; gap: 10px; color: var(--overlay-1); border-bottom: 1px solid var(--surface-0); }
-.racer-picker-search:focus-within { color: var(--mauve); }
+.racer-picker-search:focus-within { color: var(--mauve); border-color: var(--mauve); box-shadow: inset 0 -1px var(--mauve); }
 .racer-picker-search input { min-width: 0; height: 50px; flex: 1; color: var(--text); border: 0; outline: 0; background: transparent; font-size: 13px; }
 .racer-picker-search input:focus-visible { outline: 0; }
 .racer-picker-search input::placeholder { color: var(--overlay-0); }
+.racer-picker-close { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; color: var(--overlay-1); border: 1px solid color-mix(in srgb, var(--surface-1) 42%, transparent); border-radius: 8px; background: var(--base); box-shadow: var(--neu-raised-soft); cursor: pointer; }
+.racer-picker-close:hover { color: var(--text); border-color: var(--mauve); }
+.racer-picker-close:active { box-shadow: var(--neu-inset-soft); }
 .racer-picker-options { grid-column: 2; grid-row: 2; min-height: 0; overflow-y: auto; padding: 7px; scrollbar-color: var(--surface-2) transparent; }
 .racer-picker-pane-label { height: 32px; padding: 0 9px; display: flex; align-items: center; gap: 7px; color: var(--overlay-2); font: 650 9px/1 var(--mono); text-transform: uppercase; letter-spacing: .05em; }
 .racer-picker-pane-label strong { color: var(--subtext-1); }
@@ -847,18 +854,12 @@ footer { min-height: 82px; border-top-color: color-mix(in srgb, var(--surface-1)
   .connection svg { width: 16px; height: 16px; }
   .about-button { padding: 7px; font-size: 0; }
   .about-button svg { width: 16px; height: 16px; }
-  .setup-view { padding-top: 30px; }
   .hero h1 { font-size: 38px; }
   .section-intro h1, .results-hero h1 { font-size: 41px; }
   .hero > p { font-size: 14px; }
   .hero-track { min-height: 115px; }
   .panel-heading { padding-inline: 15px; }
   .count { display: none; }
-  .competitor-list { padding: 12px; }
-  .competitor-card { grid-template-columns: 38px minmax(0, 1fr) 32px; grid-template-rows: auto; }
-  .grid-position { grid-column: 1; grid-row: 1 / 4; }
-  .harness-field, .model-field, .label-field { grid-column: 2; }
-  .remove-button { grid-column: 3; grid-row: 1; }
   .race-options { grid-template-columns: 1fr; padding: 18px 13px; }
   .panel-footer { align-items: stretch; flex-direction: column; }
   .panel-footer .primary-button { width: 100%; }
@@ -938,13 +939,16 @@ footer { min-height: 82px; border-top-color: color-mix(in srgb, var(--surface-1)
 }
 
 @media (max-width: 760px) {
-  .hero { margin-bottom: 22px; }
-  .hero > p { font-size: 14px; }
-  .setup-panel .panel-heading { padding-inline: 0; }
-  .competitor-list { grid-template-columns: 1fr; padding: 0; }
-  .competitor-card { grid-template-columns: minmax(0, 1fr) 32px; grid-template-rows: auto; padding: 10px; }
+  .setup-view { width: 100%; padding: 30px 0 72px; }
+  .setup-workbench.panel { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  .setup-intro { padding: 0 0 20px; gap: 18px; }
+  .setup-intro h1 { font-size: 34px; }
+  .setup-content { padding: 0; }
+  .competitor-list { padding: 5px; }
+  .competitor-card { grid-template-columns: minmax(0, 1fr) 32px; padding: 5px 4px 5px 8px; }
   .remove-button { grid-column: 2; grid-row: 1; }
   .racer-picker { grid-column: 1; }
+  .setup-actions { padding: 16px 0 0; }
   .race-options { padding-inline: 0; }
   .panel-footer { padding-inline: 0; }
   .review-meta { grid-template-columns: 1fr 1fr 1fr; }
@@ -957,8 +961,10 @@ footer { min-height: 82px; border-top-color: color-mix(in srgb, var(--surface-1)
 }
 
 @media (max-width: 520px) {
-  .race-stripe { width: 100%; }
-  .competitor-card, .add-competitor { width: 100%; justify-self: stretch; }
+  .setup-intro { gap: 12px; }
+  .setup-intro h1 { font-size: 31px; }
+  .setup-count { margin-top: 3px; }
+  .competitor-card { width: 100%; justify-self: stretch; }
   .racer-picker-trigger { min-height: 56px; padding-inline: 9px; }
   .racer-picker-logo { width: 32px; height: 32px; }
   .racer-picker-copy small { max-width: 180px; }

@@ -479,47 +479,46 @@ export function App() {
         {page === "about" ? <About onBack={() => setPage("benchmark")} /> : <>
         {phase === "setup" && (
           <section className="setup-view page-enter">
-            <div className="hero">
-              <div className="eyebrow"><Flag size={14} /> LOCAL MODEL RACE</div>
-              <h1>Race your models.</h1>
-              <p>Compare first-token latency and streaming speed on the same prompt.</p>
-              <div className="race-stripe" aria-hidden="true"><span>START</span><i /></div>
-            </div>
+            <div className="setup-workbench panel">
+              <header className="setup-intro">
+                <div>
+                  <div className="eyebrow"><Flag size={14} /> STARTING LINEUP</div>
+                  <h1>Choose your racers.</h1>
+                </div>
+                <span className="setup-count" aria-label={`${competitors.length} of 6 models selected`}>{competitors.length} <small>/ 6</small></span>
+              </header>
 
-            <div className="setup-panel panel">
-              <div className="panel-heading">
-                <div><h2>Choose models</h2></div>
-                <span className="count">{competitors.length} / 6</span>
+              <div className="setup-content">
+                {providersLoading ? (
+                  <div className="empty-state"><LoaderCircle className="spin" /><strong>Scanning local agents…</strong><span>Checking installed harnesses and models</span></div>
+                ) : providersError ? (
+                  <div className="empty-state error-state"><AlertCircle /><strong>Agent scan failed</strong><span>{providersError}</span><button className="text-button" onClick={() => void loadProviders()}>Try again</button></div>
+                ) : (
+                  <div className="competitor-list">
+                    {competitors.map((competitor) => (
+                      <div className="competitor-card" key={competitor.id} style={{ "--lane-color": competitor.color } as React.CSSProperties}>
+                        <RacerPicker providers={runnableProviders} harness={competitor.harness} model={competitor.model} onChange={(choice) => updateSelection(competitor.id, choice)} />
+                        <button
+                          className={`icon-button remove-button${competitors.length <= 2 ? " is-hidden" : ""}`}
+                          onClick={() => removeCompetitor(competitor.id)}
+                          disabled={competitors.length <= 2}
+                          aria-hidden={competitors.length <= 2 ? true : undefined}
+                          tabIndex={competitors.length <= 2 ? -1 : undefined}
+                          aria-label={`Remove ${competitor.label}`}
+                        ><Minus size={17} /></button>
+                      </div>
+                    ))}
+                    {competitors.length < 6 && <button key="add-model" className="add-competitor" onClick={addCompetitor}><Plus size={17} /> Add model</button>}
+                  </div>
+                )}
+
+                {!canReview && !providersLoading && competitors.length > 0 && (
+                  <div className="inline-warning" role="alert"><AlertCircle size={15} /> Choose at least two available models.</div>
+                )}
               </div>
 
-              {providersLoading ? (
-                <div className="empty-state"><LoaderCircle className="spin" /><strong>Scanning local agents…</strong><span>Checking installed harnesses and models</span></div>
-              ) : providersError ? (
-                <div className="empty-state error-state"><AlertCircle /><strong>Agent scan failed</strong><span>{providersError}</span><button className="text-button" onClick={() => void loadProviders()}>Try again</button></div>
-              ) : (
-                <div className="competitor-list">
-                  {competitors.map((competitor) => (
-                    <article className="competitor-card" key={competitor.id} style={{ "--lane-color": competitor.color } as React.CSSProperties}>
-                      <RacerPicker providers={runnableProviders} harness={competitor.harness} model={competitor.model} onChange={(choice) => updateSelection(competitor.id, choice)} />
-                      <button
-                        className={`icon-button remove-button${competitors.length <= 2 ? " is-hidden" : ""}`}
-                        onClick={() => removeCompetitor(competitor.id)}
-                        disabled={competitors.length <= 2}
-                        aria-hidden={competitors.length <= 2 ? true : undefined}
-                        tabIndex={competitors.length <= 2 ? -1 : undefined}
-                        aria-label={`Remove ${competitor.label}`}
-                      ><Minus size={17} /></button>
-                    </article>
-                  ))}
-                  {competitors.length < 6 && <button className="add-competitor" onClick={addCompetitor}><Plus size={17} /> Add model</button>}
-                </div>
-              )}
-
-              {!canReview && !providersLoading && competitors.length > 0 && (
-                <div className="inline-warning" role="alert"><AlertCircle size={15} /> Choose at least two available models.</div>
-              )}
-              <div className="panel-footer">
-                <button className="primary-button" disabled={!canReview || socketState !== "open"} onClick={reviewRace}>Review starting grid <ChevronRight size={18} /></button>
+              <div className="setup-actions">
+                <button className="primary-button" disabled={!canReview || socketState !== "open"} onClick={reviewRace}>Set up race <ChevronRight size={18} /></button>
               </div>
             </div>
           </section>
