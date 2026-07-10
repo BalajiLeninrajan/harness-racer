@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, Pencil, Search } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import type { HarnessId, ModelOption, ProviderInfo } from "../shared/types";
@@ -145,7 +145,7 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
           <strong>{selected?.model.label ?? model}</strong>
           <small>{selected ? `${modelLabName(selected.model.id, selected.provider.id)} · via ${selected.provider.name}` : "Choose a model"}</small>
         </span>
-        <ChevronDown size={16} />
+        <Pencil className="racer-picker-cue" size={15} />
       </button>
 
       {open && (
