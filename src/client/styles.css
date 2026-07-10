@@ -653,10 +653,19 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
   background: transparent;
   box-shadow: none;
 }
-.setup-panel .panel-heading { min-height: 52px; padding: 8px 0; }
+.setup-panel .panel-heading { width: min(640px, 100%); min-height: 52px; margin-inline: auto; padding: 8px 0; }
 .setup-panel .step { width: 25px; height: 25px; border-radius: 7px; box-shadow: none; }
 .setup-panel .panel-heading h2 { font-size: 15px; }
-.competitor-list { grid-template-columns: 1fr; gap: 10px; padding: 14px 0 18px; }
+.competitor-list {
+  width: min(640px, 100%);
+  margin-inline: auto;
+  grid-template-columns: 1fr;
+  gap: 0;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--surface-2) 42%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--mantle) 20%, transparent);
+}
 .competitor-card {
   width: 100%;
   justify-self: stretch;
@@ -664,21 +673,24 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
   grid-template-rows: auto;
   gap: 8px;
   align-items: center;
-  padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--lane-color) 26%, var(--surface-1));
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--lane-color) 3%, transparent);
+  padding: 7px 10px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--surface-1) 58%, transparent);
+  border-radius: 0;
+  background: transparent;
   box-shadow: none;
 }
-.competitor-card::before { inset: -1px auto -1px -1px; width: 3px; border-radius: 5px 0 0 5px; box-shadow: none; }
+.competitor-card:last-of-type { border-bottom: 0; }
+.competitor-list:has(.add-competitor) .competitor-card:last-of-type { border-bottom: 1px solid color-mix(in srgb, var(--surface-1) 58%, transparent); }
+.competitor-card::before { inset: 10px auto 10px -1px; width: 3px; border-radius: 0 4px 4px 0; box-shadow: none; }
 .remove-button { grid-column: 2; grid-row: 1; align-self: center; }
 .add-competitor {
-  width: min(60%, 360px);
-  justify-self: center;
-  min-height: 58px;
-  margin: 13px 0;
+  width: 100%;
+  justify-self: stretch;
+  min-height: 54px;
+  margin: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: 0 0 6px 6px;
   background: transparent;
   box-shadow: none;
 }
@@ -749,6 +761,7 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
 .preset-grid button > span:nth-child(2) { gap: 5px; }
 .preset-grid small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panel-footer { min-height: 72px; justify-content: flex-end; padding: 13px 0; border-top: 0; }
+.setup-panel .panel-footer { width: min(640px, 100%); margin-inline: auto; }
 .panel-footer .primary-button { min-width: 205px; }
 
 .review-grid.panel { grid-template-columns: 1fr; padding: 0; border: 0; border-top: 1px solid var(--surface-0); border-bottom: 1px solid var(--surface-0); border-radius: 0; background: transparent; box-shadow: none; }
@@ -905,7 +918,7 @@ footer { min-height: 82px; border-top-color: color-mix(in srgb, var(--surface-1)
   .hero { margin-bottom: 22px; }
   .hero > p { font-size: 14px; }
   .setup-panel .panel-heading { padding-inline: 0; }
-  .competitor-list { grid-template-columns: 1fr; padding-inline: 0; }
+  .competitor-list { grid-template-columns: 1fr; padding: 0; }
   .competitor-card { grid-template-columns: minmax(0, 1fr) 32px; grid-template-rows: auto; padding: 10px; }
   .remove-button { grid-column: 2; grid-row: 1; }
   .racer-picker { grid-column: 1; }
@@ -936,28 +949,4 @@ footer { min-height: 82px; border-top-color: color-mix(in srgb, var(--surface-1)
   .review-meta { grid-template-columns: 1fr; }
   .review-meta div { border-right: 0; border-bottom: 1px solid var(--surface-0); }
   .footer-brand > span { display: none; }
-}
-
-@media (min-width: 641px) {
-  .competitor-list {
-    --grid-lane-gap: clamp(18px, 2.2vw, 28px);
-    --grid-box-width: min(calc((100% - var(--grid-lane-gap)) / 2), 420px);
-    grid-template-columns: repeat(2, var(--grid-box-width));
-    grid-auto-rows: 46px;
-    column-gap: var(--grid-lane-gap);
-    row-gap: 0;
-    justify-content: center;
-  }
-  .competitor-card { width: auto; height: 80px; justify-self: stretch; padding: 10px; }
-  .competitor-card:nth-of-type(1) { grid-column: 1; grid-row: 1 / span 2; }
-  .competitor-card:nth-of-type(2) { grid-column: 2; grid-row: 2 / span 2; }
-  .competitor-card:nth-of-type(3) { grid-column: 1; grid-row: 3 / span 2; }
-  .competitor-card:nth-of-type(4) { grid-column: 2; grid-row: 4 / span 2; }
-  .competitor-card:nth-of-type(5) { grid-column: 1; grid-row: 5 / span 2; }
-  .competitor-card:nth-of-type(6) { grid-column: 2; grid-row: 6 / span 2; }
-  .add-competitor { grid-column: 1 / 3; grid-row: auto / span 2; align-self: center; margin: 0; }
-}
-
-@media (max-width: 640px) {
-  .competitor-card, .add-competitor { width: 100%; justify-self: stretch; }
 }
