@@ -2,8 +2,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
 import { createOpencodeClient } from "@opencode-ai/sdk/v2";
 
-import type { ModelOption, ProviderInfo } from "../../shared/types.js";
-import type { AdapterRunInput, AdapterRunOutput, HarnessAdapter } from "./types.js";
+import type { ModelOption } from "../../shared/types.js";
+import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 interface OpenCodeProcess {
   child: ChildProcess;
@@ -187,12 +187,12 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
   }
 }
 
-export const openCodeAdapter: HarnessAdapter = {
+export const openCodeAdapter = defineAdapter({
   id: "opencode",
   name: "OpenCode",
   command: "opencode",
-
-  async probe(): Promise<ProviderInfo> {
+}, {
+  async probe(): Promise<AdapterProbeResult> {
     let version = "";
     try {
       const child = spawn("opencode", ["--version"], { env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"] });
@@ -209,9 +209,6 @@ export const openCodeAdapter: HarnessAdapter = {
       version = output.trim().split(/\r?\n/)[0] ?? "";
     } catch (error) {
       return {
-        id: "opencode",
-        name: "OpenCode",
-        command: "opencode",
         installed: false,
         authenticated: null,
         models: [],
@@ -221,9 +218,6 @@ export const openCodeAdapter: HarnessAdapter = {
     try {
       const inventory = await loadInventory(process.cwd());
       return {
-        id: "opencode",
-        name: "OpenCode",
-        command: "opencode",
         installed: true,
         authenticated: inventory.models.length > 0,
         version,
@@ -232,9 +226,6 @@ export const openCodeAdapter: HarnessAdapter = {
       };
     } catch (error) {
       return {
-        id: "opencode",
-        name: "OpenCode",
-        command: "opencode",
         installed: true,
         authenticated: false,
         version,
@@ -244,9 +235,5 @@ export const openCodeAdapter: HarnessAdapter = {
     }
   },
 
-  async listModels(): Promise<ModelOption[]> {
-    return (await loadInventory(process.cwd())).models;
-  },
-
   run: runOpenCode,
-};
+});

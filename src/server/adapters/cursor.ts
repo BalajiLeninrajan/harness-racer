@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
-import type { ModelOption, ProviderInfo } from "../../shared/types.js";
-import type { AdapterRunInput, AdapterRunOutput, HarnessAdapter } from "./types.js";
+import type { ModelOption } from "../../shared/types.js";
+import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 const CURSOR_COMMANDS = ["agent", "cursor-agent"] as const;
 const FALLBACK_MODELS: ModelOption[] = [
@@ -438,20 +438,17 @@ async function runCursor(input: AdapterRunInput): Promise<AdapterRunOutput> {
   }
 }
 
-export const cursorAdapter: HarnessAdapter = {
+export const cursorAdapter = defineAdapter({
   id: "cursor",
   name: "Cursor",
   command: "agent",
-
-  async probe(): Promise<ProviderInfo> {
+}, {
+  async probe(): Promise<AdapterProbeResult> {
     let command: string;
     try {
       command = await cursorCommand();
     } catch (error) {
       return {
-        id: "cursor",
-        name: "Cursor",
-        command: "agent",
         installed: false,
         authenticated: null,
         message: error instanceof Error ? error.message : String(error),
@@ -490,9 +487,6 @@ export const cursorAdapter: HarnessAdapter = {
     const statusMessage = statusResult.code === 0 ? undefined : stripAnsi(statusResult.stderr || statusResult.stdout).trim();
 
     return {
-      id: "cursor",
-      name: "Cursor",
-      command,
       installed: true,
       authenticated,
       version: stripAnsi(versionResult.stdout || versionResult.stderr).trim().split(/\r?\n/)[0],
@@ -502,9 +496,5 @@ export const cursorAdapter: HarnessAdapter = {
     };
   },
 
-  async listModels(): Promise<ModelOption[]> {
-    return (await discoverCursorModels()).models;
-  },
-
   run: runCursor,
-};
+});

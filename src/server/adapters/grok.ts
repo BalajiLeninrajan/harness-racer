@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
-import type { ModelOption, ProviderInfo } from "../../shared/types.js";
-import type { AdapterRunInput, AdapterRunOutput, HarnessAdapter } from "./types.js";
+import type { ModelOption } from "../../shared/types.js";
+import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -214,12 +214,12 @@ async function runGrok(input: AdapterRunInput): Promise<AdapterRunOutput> {
   }
 }
 
-export const grokAdapter: HarnessAdapter = {
+export const grokAdapter = defineAdapter({
   id: "grok",
   name: "Grok",
   command: "grok",
-
-  async probe(): Promise<ProviderInfo> {
+}, {
+  async probe(): Promise<AdapterProbeResult> {
     let version = "";
     try {
       const child = spawn("grok", ["--version"], { env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"] });
@@ -236,9 +236,6 @@ export const grokAdapter: HarnessAdapter = {
       version = output.trim().split(/\r?\n/)[0] ?? "";
     } catch (error) {
       return {
-        id: "grok",
-        name: "Grok",
-        command: "grok",
         installed: false,
         authenticated: null,
         models: [],
@@ -248,9 +245,6 @@ export const grokAdapter: HarnessAdapter = {
     try {
       const discovery = await discoverGrokModels();
       return {
-        id: "grok",
-        name: "Grok",
-        command: "grok",
         installed: true,
         authenticated: true,
         version,
@@ -259,9 +253,6 @@ export const grokAdapter: HarnessAdapter = {
       };
     } catch (error) {
       return {
-        id: "grok",
-        name: "Grok",
-        command: "grok",
         installed: true,
         authenticated: false,
         version,
@@ -272,9 +263,5 @@ export const grokAdapter: HarnessAdapter = {
     }
   },
 
-  async listModels(): Promise<ModelOption[]> {
-    return (await discoverGrokModels()).models;
-  },
-
   run: runGrok,
-};
+});

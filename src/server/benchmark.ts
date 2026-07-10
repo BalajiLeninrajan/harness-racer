@@ -226,7 +226,7 @@ async function runSequential(
 
 export async function runBenchmark(
   request: BenchmarkRequest,
-  adapterList: HarnessAdapter[],
+  adapterList: readonly HarnessAdapter[],
   signal: AbortSignal,
   emit: Emit,
 ): Promise<void> {

@@ -1,8 +1,8 @@
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface, type Interface as ReadlineInterface } from "node:readline";
 
-import type { ModelOption, ProviderInfo } from "../../shared/types.js";
-import type { AdapterRunInput, AdapterRunOutput, HarnessAdapter } from "./types.js";
+import type { ModelOption } from "../../shared/types.js";
+import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 const COMMAND = "codex";
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -391,21 +391,18 @@ async function interruptTurn(client: CodexRpcClient, threadId: string, turnId: s
   ]);
 }
 
-export const codexAdapter: HarnessAdapter = {
+export const codexAdapter = defineAdapter({
   id: "codex",
   name: "Codex",
   command: COMMAND,
-
-  async probe(): Promise<ProviderInfo> {
+}, {
+  async probe(): Promise<AdapterProbeResult> {
     let version: string;
     try {
       version = await readVersion();
     } catch (error) {
       const code = isObject(error) ? error.code : undefined;
       return {
-        id: "codex",
-        name: "Codex",
-        command: COMMAND,
         installed: code !== "ENOENT",
         authenticated: null,
         models: [],
@@ -417,9 +414,6 @@ export const codexAdapter: HarnessAdapter = {
       const inspection = await inspectCodex(process.cwd());
       const defaultModel = inspection.models.find((model) => model.isDefault)?.id;
       return {
-        id: "codex",
-        name: "Codex",
-        command: COMMAND,
         installed: true,
         authenticated: inspection.authenticated,
         version,
@@ -429,9 +423,6 @@ export const codexAdapter: HarnessAdapter = {
       };
     } catch (error) {
       return {
-        id: "codex",
-        name: "Codex",
-        command: COMMAND,
         installed: true,
         authenticated: null,
         version,
@@ -439,10 +430,6 @@ export const codexAdapter: HarnessAdapter = {
         message: errorMessage(error),
       };
     }
-  },
-
-  async listModels(): Promise<ModelOption[]> {
-    return (await inspectCodex(process.cwd())).models;
   },
 
   async run(input: AdapterRunInput): Promise<AdapterRunOutput> {
@@ -564,6 +551,6 @@ export const codexAdapter: HarnessAdapter = {
       client.close();
     }
   },
-};
+});
 
 export default codexAdapter;

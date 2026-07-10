@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { query, type Query } from "@anthropic-ai/claude-agent-sdk";
 
-import type { ModelOption, ProviderInfo } from "../../shared/types.js";
-import type { AdapterRunInput, AdapterRunOutput, HarnessAdapter } from "./types.js";
+import type { ModelOption } from "../../shared/types.js";
+import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 const CLAUDE_MODELS: ModelOption[] = [
   { id: "claude-sonnet-5", label: "Claude Sonnet 5", isDefault: true },
@@ -130,20 +130,17 @@ async function runClaude(input: AdapterRunInput): Promise<AdapterRunOutput> {
   }
 }
 
-export const claudeAdapter: HarnessAdapter = {
+export const claudeAdapter = defineAdapter({
   id: "claudeAgent",
   name: "Claude",
   command: "claude",
-
-  async probe(): Promise<ProviderInfo> {
+}, {
+  async probe(): Promise<AdapterProbeResult> {
     let version: CommandResult;
     try {
       version = await runCommand(["--version"]);
     } catch (error) {
       return {
-        id: "claudeAgent",
-        name: "Claude",
-        command: "claude",
         installed: false,
         authenticated: null,
         models: [],
@@ -160,9 +157,6 @@ export const claudeAdapter: HarnessAdapter = {
       authenticated = null;
     }
     return {
-      id: "claudeAgent",
-      name: "Claude",
-      command: "claude",
       installed: version.code === 0,
       authenticated,
       version: (version.stdout || version.stderr).trim().split(/\r?\n/)[0],
@@ -171,9 +165,5 @@ export const claudeAdapter: HarnessAdapter = {
     };
   },
 
-  async listModels(): Promise<ModelOption[]> {
-    return CLAUDE_MODELS.map((model) => ({ ...model }));
-  },
-
   run: runClaude,
-};
+});

@@ -1,4 +1,10 @@
-export type HarnessId = "codex" | "claudeAgent" | "cursor" | "grok" | "opencode";
+export const HARNESS_IDS = ["codex", "claudeAgent", "cursor", "grok", "opencode"] as const;
+
+export type HarnessId = (typeof HARNESS_IDS)[number];
+
+export function isHarnessId(value: unknown): value is HarnessId {
+  return typeof value === "string" && (HARNESS_IDS as readonly string[]).includes(value);
+}
 
 export type RunMode = "parallel" | "sequential";
 export type SamplePreset = "quick" | "standard" | "thorough";
