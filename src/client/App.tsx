@@ -2,11 +2,9 @@ import {
   Activity,
   AlertCircle,
   ArrowLeft,
-  Bot,
   Check,
   ChevronRight,
   CircleStop,
-  Clock3,
   Code2,
   Flag,
   Gauge,
@@ -14,20 +12,16 @@ import {
   Minus,
   Play,
   Plus,
-  Radio,
   RotateCcw,
   Info,
-  Sparkles,
-  Terminal,
   Trophy,
   Wifi,
   WifiOff,
-  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { About } from "./About";
-import { HarnessPicker } from "./HarnessPicker";
-import { ModelPicker } from "./ModelPicker";
+import { ModelLabLogo, modelLabName } from "./BrandLogo";
+import { RacerPicker, type RacerChoice } from "./RacerPicker";
 import type {
   ClientMessage,
   Competitor,
@@ -62,10 +56,10 @@ interface LaneState {
 }
 
 const COLORS = ["#cba6f7", "#94e2d5", "#f9e2af", "#89b4fa", "#fab387", "#f5c2e7"];
-const PRESETS: Array<{ id: SamplePreset; label: string; detail: string; runs: string }> = [
-  { id: "quick", label: "Quick", detail: "A fast signal", runs: "2 heats" },
-  { id: "standard", label: "Standard", detail: "Balanced accuracy", runs: "2 warmups + 6 runs" },
-  { id: "thorough", label: "Thorough", detail: "Highest confidence", runs: "2 warmups + 10 runs" },
+const PRESETS: Array<{ id: SamplePreset; label: string; runs: string }> = [
+  { id: "quick", label: "Quick", runs: "2 runs" },
+  { id: "standard", label: "Standard", runs: "2 warmups · 6 runs" },
+  { id: "thorough", label: "Thorough", runs: "2 warmups · 10 runs" },
 ];
 
 const HARNESS_LABELS: Record<HarnessId, string> = {
@@ -138,19 +132,10 @@ function providerResponse(payload: unknown): ProviderInfo[] {
   return [];
 }
 
-function HarnessMark({ harness }: { harness: HarnessId }) {
-  const icon = harness === "codex"
-    ? <Sparkles size={15} />
-    : harness === "cursor"
-      ? <Terminal size={15} />
-      : harness === "claudeAgent"
-        ? <Bot size={15} />
-        : harness === "opencode"
-          ? <Code2 size={15} />
-          : <Zap size={15} />;
+function ModelMark({ harness, model }: { harness: HarnessId; model: string }) {
   return (
     <span className={`harness-mark harness-${harness}`} aria-hidden="true">
-      {icon}
+      <ModelLabLogo harness={harness} model={model} size={16} />
     </span>
   );
 }
@@ -376,13 +361,13 @@ export function App() {
   }, []);
 
   const providerMap = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
-  const installedProviders = useMemo(() => providers.filter((provider) => provider.installed), [providers]);
-  const runnableProviders = useMemo(() => installedProviders.filter((provider) => provider.authenticated !== false && provider.models.length > 0), [installedProviders]);
-  const invalidCompetitors = competitors.filter((competitor) => {
+  const runnableProviders = useMemo(() => providers.filter((provider) => provider.installed && provider.authenticated !== false && provider.models.length > 0), [providers]);
+  const invalidSelections = competitors.filter((competitor) => {
     const provider = providerMap.get(competitor.harness);
-    return !competitor.label.trim() || !competitor.model.trim() || !provider?.installed || provider.authenticated === false || !provider.models.some((model) => model.id === competitor.model);
+    return !competitor.model.trim() || !provider?.installed || provider.authenticated === false || !provider.models.some((model) => model.id === competitor.model);
   });
-  const canReview = competitors.length >= 2 && competitors.length <= 6 && invalidCompetitors.length === 0;
+  const canReview = competitors.length >= 2 && competitors.length <= 6 && invalidSelections.length === 0;
+  const canStart = canReview && competitors.every((competitor) => competitor.label.trim());
   const expectedPerLane = totalRuns ? Math.ceil(totalRuns / Math.max(competitors.length, 1)) : 1;
   const activeWorkload = Object.values(lanes).find((lane) => lane.status === "running" || lane.status === "starting")?.workload;
   const invalidResults = results.filter((result) => !result.valid && !result.warmup);
@@ -394,19 +379,18 @@ export function App() {
     setCompetitors((current) => current.map((competitor) => (competitor.id === id ? { ...competitor, ...patch } : competitor)));
   }
 
-  function updateHarness(id: string, harness: HarnessId) {
-    const provider = providerMap.get(harness);
-    if (!provider) return;
-    const model = providerModel(provider);
-    updateCompetitor(id, {
-      harness,
-      model,
-      label: provider.models.find((option) => option.id === model)?.label ?? model,
-    });
-  }
-
-  function updateModel(id: string, model: { id: string; label: string }) {
-    updateCompetitor(id, { model: model.id, label: model.label });
+  function updateSelection(id: string, choice: RacerChoice) {
+    setCompetitors((current) => current.map((competitor) => {
+      if (competitor.id !== id) return competitor;
+      const previousModel = providerMap.get(competitor.harness)?.models.find((model) => model.id === competitor.model);
+      const labelWasAutomatic = !competitor.label.trim() || competitor.label === competitor.model || competitor.label === previousModel?.label;
+      return {
+        ...competitor,
+        harness: choice.provider.id,
+        model: choice.model.id,
+        label: labelWasAutomatic ? choice.model.label : competitor.label,
+      };
+    }));
   }
 
   function addCompetitor() {
@@ -432,7 +416,7 @@ export function App() {
   }
 
   function startRace() {
-    if (!canReview) return;
+    if (!canStart) return;
     setNotice(undefined);
     setResults([]);
     setSummary([]);
@@ -449,8 +433,13 @@ export function App() {
     send({ type: "cancel" });
   }
 
-  function resetRace() {
+  function reviewRace() {
     setPhase("review");
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
+  }
+
+  function resetRace() {
+    reviewRace();
     setNotice(undefined);
     setResults([]);
     setSummary([]);
@@ -465,17 +454,16 @@ export function App() {
         <button className="brand" disabled={phase === "running"} onClick={() => { setPage("benchmark"); setPhase("setup"); }} aria-label="TPS Racer home">
           <span className="brand-icon"><Gauge size={19} /></span>
           <span><b>tps</b>.racer</span>
-          <span className="version">local</span>
         </button>
         <div className={page === "about" ? "page-context" : "phase-track"} aria-label={page === "about" ? "Current page" : "Benchmark progress"}>
           {page === "about" ? <><Info size={13} /> Methodology</> : <>
-            <span className={phase === "setup" ? "active" : "done"}><i>1</i>Grid</span>
+            <span className={phase === "setup" ? "active" : "done"}><i>1</i>Racers</span>
             <b />
-            <span className={phase === "review" ? "active" : phase === "running" || phase === "results" ? "done" : ""}><i>2</i>Check</span>
+            <span className={phase === "review" ? "active" : phase === "running" || phase === "results" ? "done" : ""}><i>2</i>Grid</span>
             <b />
             <span className={phase === "running" ? "active" : phase === "results" ? "done" : ""}><i>3</i>Race</span>
             <b />
-            <span className={phase === "results" ? "active" : ""}><i>4</i>Finish</span>
+            <span className={phase === "results" ? "active" : ""}><i>4</i>Results</span>
           </>}
         </div>
         <div className="topbar-actions">
@@ -492,25 +480,16 @@ export function App() {
         {phase === "setup" && (
           <section className="setup-view page-enter">
             <div className="hero">
-              <div className="eyebrow"><span className="live-dot" /> BENCHMARKS, BUT MAKE IT A RACE</div>
-              <h1>Pick your ponies.<br /><em>Let the tokens fly.</em></h1>
-              <p>Same prompt. Same starting gun. Your harness + model stacks sprint side by side while we clock visible responsiveness and streaming speed.</p>
-              <div className="hero-stats">
-                <span><Zap size={15} /> visible tokens / sec</span>
-                <span><Clock3 size={15} /> prompt → first output</span>
-                <span><Terminal size={15} /> harness + model stacks</span>
-              </div>
-              <div className="hero-track" aria-hidden="true">
-                <span style={{ "--track-color": "#cba6f7", "--track-offset": "13%" } as React.CSSProperties}><i /></span>
-                <span style={{ "--track-color": "#94e2d5", "--track-offset": "48%" } as React.CSSProperties}><i /></span>
-                <span style={{ "--track-color": "#f9e2af", "--track-offset": "72%" } as React.CSSProperties}><i /></span>
-              </div>
+              <div className="eyebrow"><Flag size={14} /> LOCAL MODEL RACE</div>
+              <h1>Race your models.</h1>
+              <p>Compare first-token latency and streaming speed on the same prompt.</p>
+              <div className="race-stripe" aria-hidden="true"><span>START</span><i /></div>
             </div>
 
             <div className="setup-panel panel">
               <div className="panel-heading">
-                <div><span className="step">01</span><h2>Build the starting grid</h2></div>
-                <span className="count">{competitors.length} of 6 lanes filled</span>
+                <div><h2>Choose models</h2></div>
+                <span className="count">{competitors.length} / 6</span>
               </div>
 
               {providersLoading ? (
@@ -519,70 +498,21 @@ export function App() {
                 <div className="empty-state error-state"><AlertCircle /><strong>Agent scan failed</strong><span>{providersError}</span><button className="text-button" onClick={() => void loadProviders()}>Try again</button></div>
               ) : (
                 <div className="competitor-list">
-                  {competitors.map((competitor, index) => {
-                    const provider = providerMap.get(competitor.harness);
-                    return (
-                      <article className="competitor-card" key={competitor.id} style={{ "--lane-color": competitor.color } as React.CSSProperties}>
-                        <div className="grid-position">{String(index + 1).padStart(2, "0")}</div>
-                        <div className="field harness-field">
-                          <label>Harness</label>
-                          <HarnessPicker
-                            providers={installedProviders}
-                            value={competitor.harness}
-                            renderIcon={(candidate) => <HarnessMark harness={candidate.id} />}
-                            onChange={(candidate) => updateHarness(competitor.id, candidate.id)}
-                          />
-                        </div>
-                        <div className="field model-field">
-                          <label>Model</label>
-                          <ModelPicker
-                            models={provider?.models ?? []}
-                            value={competitor.model}
-                            providerName={provider?.name ?? HARNESS_LABELS[competitor.harness]}
-                            providerIcon={<HarnessMark harness={competitor.harness} />}
-                            onChange={(model) => updateModel(competitor.id, model)}
-                          />
-                        </div>
-                        <div className="field label-field">
-                          <label>Race label</label>
-                          <input value={competitor.label} maxLength={32} onChange={(event) => updateCompetitor(competitor.id, { label: event.target.value })} placeholder="Display name" />
-                        </div>
-                        <button className="icon-button remove-button" onClick={() => removeCompetitor(competitor.id)} disabled={competitors.length <= 2} aria-label={`Remove ${competitor.label}`}><Minus size={17} /></button>
-                      </article>
-                    );
-                  })}
-                  {competitors.length < 6 && <button className="add-competitor" onClick={addCompetitor}><Plus size={17} /> Add another lane</button>}
+                  {competitors.map((competitor) => (
+                    <article className="competitor-card" key={competitor.id} style={{ "--lane-color": competitor.color } as React.CSSProperties}>
+                      <RacerPicker providers={runnableProviders} harness={competitor.harness} model={competitor.model} onChange={(choice) => updateSelection(competitor.id, choice)} />
+                      <button className="icon-button remove-button" onClick={() => removeCompetitor(competitor.id)} disabled={competitors.length <= 2} aria-label={`Remove ${competitor.label}`}><Minus size={17} /></button>
+                    </article>
+                  ))}
+                  {competitors.length < 6 && <button className="add-competitor" onClick={addCompetitor}><Plus size={17} /> Add model</button>}
                 </div>
               )}
-
-              <div className="race-options">
-                <div className="option-group">
-                  <label className="option-label"><span className="step">02</span> Starting style</label>
-                  <div className="segmented">
-                    <button aria-pressed={mode === "parallel"} className={mode === "parallel" ? "active" : ""} onClick={() => setMode("parallel")}><Activity size={16} /><span><b>Same gun</b><small>Launch together</small></span></button>
-                    <button aria-pressed={mode === "sequential"} className={mode === "sequential" ? "active" : ""} onClick={() => setMode("sequential")}><ChevronRight size={16} /><span><b>Time trial</b><small>One at a time</small></span></button>
-                  </div>
-                </div>
-                <div className="option-group">
-                  <label className="option-label"><span className="step">03</span> How serious?</label>
-                  <div className="preset-grid">
-                    {PRESETS.map((option) => (
-                      <button key={option.id} aria-pressed={preset === option.id} className={preset === option.id ? "active" : ""} onClick={() => setPreset(option.id)}>
-                        <span className="radio-mark">{preset === option.id && <span />}</span>
-                        <span><b>{option.label}</b><small>{option.detail}</small></span>
-                        <em>{option.runs}</em>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
 
               {!canReview && !providersLoading && competitors.length > 0 && (
-                <div className="inline-warning" role="alert"><AlertCircle size={15} /> Every racer needs an installed, authenticated harness, model, and label.</div>
+                <div className="inline-warning" role="alert"><AlertCircle size={15} /> Choose at least two available models.</div>
               )}
               <div className="panel-footer">
-                <p><Radio size={14} /> The stopwatch lives here. Only your normal model traffic leaves the machine.</p>
-                <button className="primary-button" disabled={!canReview || socketState !== "open"} onClick={() => setPhase("review")}>Head to the pits <ChevronRight size={18} /></button>
+                <button className="primary-button" disabled={!canReview || socketState !== "open"} onClick={reviewRace}>Review starting grid <ChevronRight size={18} /></button>
               </div>
             </div>
           </section>
@@ -590,35 +520,50 @@ export function App() {
 
         {phase === "review" && (
           <section className="review-view narrow-view page-enter">
-            <button className="back-button" onClick={() => setPhase("setup")}><ArrowLeft size={16} /> Edit starting grid</button>
+            <button className="back-button" onClick={() => setPhase("setup")}><ArrowLeft size={16} /> Edit models</button>
             <div className="section-intro">
               <div>
-                <div className="eyebrow"><Flag size={14} /> PIT CHECK</div>
-                <h1>Last look before lights out.</h1>
-                <p>These runs use your normal model quota. Make sure every lane looks right.</p>
+                <div className="eyebrow"><Flag size={14} /> STARTING GRID</div>
+                <h1>Name your racers.</h1>
+                <p>Confirm the lineup, then start the benchmark.</p>
               </div>
               <div className="starting-lights" aria-hidden="true"><span /><span /><span /></div>
             </div>
             <div className="review-grid panel">
-              <div className="review-meta">
-                <div><span>START</span><strong>{mode === "parallel" ? "Same gun" : "Time trial"}</strong></div>
-                <div><span>DISTANCE</span><strong>{PRESETS.find((item) => item.id === preset)?.label}</strong></div>
-                <div><span>TRACKS</span><strong>Attention + nanoGPT</strong></div>
+              <div className="race-options starting-grid-options">
+                <div className="option-group">
+                  <label className="option-label">Run order</label>
+                  <div className="segmented">
+                    <button aria-pressed={mode === "parallel"} className={mode === "parallel" ? "active" : ""} onClick={() => setMode("parallel")}><Activity size={16} /><span><b>Parallel</b><small>Run together</small></span></button>
+                    <button aria-pressed={mode === "sequential"} className={mode === "sequential" ? "active" : ""} onClick={() => setMode("sequential")}><ChevronRight size={16} /><span><b>Sequential</b><small>One at a time</small></span></button>
+                  </div>
+                </div>
+                <div className="option-group">
+                  <label className="option-label">Samples</label>
+                  <div className="preset-grid">
+                    {PRESETS.map((option) => (
+                      <button key={option.id} aria-pressed={preset === option.id} className={preset === option.id ? "active" : ""} onClick={() => setPreset(option.id)}>
+                        <span className="radio-mark">{preset === option.id && <span />}</span>
+                        <span><b>{option.label}</b><small>{option.runs}</small></span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="review-racers">
                 {competitors.map((competitor, index) => (
                   <div key={competitor.id} className="review-racer" style={{ "--lane-color": competitor.color } as React.CSSProperties}>
                     <span className="review-number">{index + 1}</span>
-                    <HarnessMark harness={competitor.harness} />
-                    <div><strong>{competitor.label}</strong><span>{HARNESS_LABELS[competitor.harness]} · {competitor.model}</span></div>
-                    <Check size={17} />
+                    <ModelMark harness={competitor.harness} model={competitor.model} />
+                    <div className="review-racer-model"><strong>{providerMap.get(competitor.harness)?.models.find((model) => model.id === competitor.model)?.label ?? competitor.model}</strong><span>{modelLabName(competitor.model, competitor.harness)} · via {HARNESS_LABELS[competitor.harness]}</span></div>
+                    <label className="review-name"><span>Race name</span><input value={competitor.label} maxLength={32} onChange={(event) => updateCompetitor(competitor.id, { label: event.target.value })} placeholder="Name this racer" /></label>
                   </div>
                 ))}
               </div>
               {notice && <div className="inline-warning"><AlertCircle size={15} /> {notice}</div>}
-              <button className="launch-button" onClick={startRace} disabled={socketState !== "open"}>
+              <button className="launch-button" onClick={startRace} disabled={!canStart || socketState !== "open"}>
                 <span><Play size={21} fill="currentColor" /></span>
-                <div><b>LIGHTS OUT</b><small>Start the live benchmark</small></div>
+                <div><b>Start race</b><small>Run the benchmark</small></div>
                 <ChevronRight size={21} />
               </button>
             </div>
@@ -658,7 +603,7 @@ export function App() {
                     <div className="lane-stripe" />
                     <div className="lane-head">
                       <span className="lane-position">P{index + 1}</span>
-                      <HarnessMark harness={competitor.harness} />
+                      <ModelMark harness={competitor.harness} model={competitor.model} />
                       <div className="lane-identity"><strong>{competitor.label}</strong><span>{competitor.model}</span></div>
                       <div className="lane-status">
                         {lane.status === "running" ? <><span className="live-dot" /> STREAMING</> : lane.status === "starting" || lane.status === "ready" || lane.status === "queued" ? <><LoaderCircle className="spin" size={13} /> {lane.status.toUpperCase()}</> : lane.status === "error" ? <><AlertCircle size={13} /> ERROR</> : <><Check size={13} /> HEAT DONE</>}
@@ -702,7 +647,7 @@ export function App() {
                 <article className="winner-card" style={{ "--lane-color": winner.competitor.color } as React.CSSProperties}>
                   <div className="winner-kicker"><Trophy size={16} /> Fastest prompt-to-finish</div>
                   <div className="winner-identity">
-                    <HarnessMark harness={winner.competitor.harness} />
+                    <ModelMark harness={winner.competitor.harness} model={winner.competitor.model} />
                     <div><h2>{winner.competitor.label}</h2><span>{winner.competitor.model}</span></div>
                   </div>
                   <div className="winner-time"><strong>{formatMs(winner.promptToFinishMs)}</strong><span>median prompt → finish</span></div>
@@ -716,7 +661,7 @@ export function App() {
                   {eligibleSummary.slice(1, 3).map((row) => (
                     <article className="runner-card" key={row.competitor.id} style={{ "--lane-color": row.competitor.color } as React.CSSProperties}>
                       <span className="runner-place">{ordinal(row.finishRank)}</span>
-                      <HarnessMark harness={row.competitor.harness} />
+                      <ModelMark harness={row.competitor.harness} model={row.competitor.model} />
                       <div><strong>{row.competitor.label}</strong><small>{row.competitor.model}</small></div>
                       <b>{formatMs(row.promptToFinishMs)}</b>
                     </article>
@@ -738,7 +683,7 @@ export function App() {
                       {summary.map((row) => (
                         <tr className={row.disqualified ? "disqualified" : row.anomalousRuns > 0 ? "has-anomalies" : undefined} key={row.competitor.id}>
                           <td><span className={`position-badge ${row.disqualified ? "position-dsq" : `position-${row.finishRank}`}`}>{row.disqualified ? "DSQ" : row.finishRank}</span></td>
-                          <td><div className="table-racer"><span className="table-lane-swatch" style={{ background: row.competitor.color }} /><HarnessMark harness={row.competitor.harness} /><div><strong>{row.competitor.label}</strong><small>{row.competitor.model}</small>{row.anomalousRuns > 0 && <span className="anomaly-chip">{row.disqualified ? "all runs anomalous" : `${row.anomalousRuns} anomalous ${row.anomalousRuns === 1 ? "run" : "runs"}`}</span>}</div></div></td>
+                          <td><div className="table-racer"><span className="table-lane-swatch" style={{ background: row.competitor.color }} /><ModelMark harness={row.competitor.harness} model={row.competitor.model} /><div><strong>{row.competitor.label}</strong><small>{row.competitor.model}</small>{row.anomalousRuns > 0 && <span className="anomaly-chip">{row.disqualified ? "all runs anomalous" : `${row.anomalousRuns} anomalous ${row.anomalousRuns === 1 ? "run" : "runs"}`}</span>}</div></div></td>
                           <td className={row.crowns.includes("firstOutput") ? "crowned" : ""}>{formatMs(row.promptToFirstOutputMs)}{row.crowns.includes("firstOutput") && <span className="best-chip">best</span>}</td>
                           <td className={row.crowns.includes("coldStart") ? "crowned" : ""}>{formatMs(row.coldStartToFirstOutputMs)}{row.crowns.includes("coldStart") && <span className="best-chip">best</span>}</td>
                           <td className={row.crowns.includes("visibleSpeed") ? "crowned" : ""}>{formatVisibleRate(row.visibleTokensPerSecond)}{row.crowns.includes("visibleSpeed") && <span className="best-chip">best</span>}</td>
@@ -778,7 +723,10 @@ export function App() {
         </>}
       </main>
 
-      <footer><span>TPS RACER</span><p>Harness + model benchmark · normalized visible output · local conditions included</p><button disabled={phase === "running"} onClick={() => setPage(page === "about" ? "benchmark" : "about")}>{page === "about" ? "Back to race" : "Read the methodology"}</button></footer>
+      <footer>
+        <div className="footer-brand"><Gauge size={16} /><strong><b>tps</b>.racer</strong><span>Model speed benchmark</span></div>
+        <div className="footer-metrics"><span>TTFT</span><i /><span>TPS</span><i /><span>Total time</span></div>
+      </footer>
     </div>
   );
 }
