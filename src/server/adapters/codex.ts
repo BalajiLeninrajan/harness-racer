@@ -21,11 +21,30 @@ interface CodexModel {
   displayName: string;
   isDefault: boolean;
   hidden?: boolean;
+  defaultReasoningEffort?: string;
 }
 
 interface InspectionResult {
   authenticated: boolean;
   models: ModelOption[];
+}
+
+const reasoningEffortByModel = new Map<string, string>();
+
+export function codexTurnStartParams(
+  threadId: string,
+  model: string,
+  prompt: string,
+  effort = "medium",
+): JsonObject {
+  return {
+    threadId,
+    model,
+    effort,
+    input: [{ type: "text", text: prompt, text_elements: [] }],
+    approvalPolicy: "never",
+    sandboxPolicy: { type: "readOnly", networkAccess: false },
+  };
 }
 
 function isObject(value: unknown): value is JsonObject {
@@ -338,6 +357,9 @@ async function readModels(client: CodexRpcClient): Promise<ModelOption[]> {
       const model = raw as unknown as CodexModel;
       if (typeof model.model !== "string" || typeof model.displayName !== "string") continue;
       if (model.hidden) continue;
+      if (typeof model.defaultReasoningEffort === "string") {
+        reasoningEffortByModel.set(model.model, model.defaultReasoningEffort);
+      }
       models.push({
         id: model.model,
         label: model.displayName,
@@ -522,13 +544,12 @@ export const codexAdapter = defineAdapter({
 
       const started = await client.request<JsonObject>(
         "turn/start",
-        {
+        codexTurnStartParams(
           threadId,
-          model: input.model,
-          input: [{ type: "text", text: input.prompt }],
-          approvalPolicy: "never",
-          sandboxPolicy: { type: "readOnly" },
-        },
+          input.model,
+          input.prompt,
+          reasoningEffortByModel.get(input.model) ?? "medium",
+        ),
         { signal: input.signal, timeoutMs: RUN_TIMEOUT_MS },
       );
       const turn = isObject(started.turn) ? started.turn : undefined;
