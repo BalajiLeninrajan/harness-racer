@@ -18,6 +18,7 @@
     "dev": "tsx src/cli.ts --dev",
     "benchmark": "tsx src/cli.ts --dev",
     "build": "vite build && tsup",
+    "ci": "pnpm typecheck && pnpm test && pnpm build",
     "start": "node dist/cli.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
