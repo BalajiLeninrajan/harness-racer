@@ -7,53 +7,42 @@ export interface Workload {
   prompt: string;
 }
 
-const proseCorpus = `At the edge of the city, the test track woke before sunrise. Floodlights faded as a thin orange line appeared behind the grandstand, and three silent machines rolled toward the start. Their bodywork carried no sponsor marks, only bright numbers painted across the doors. Engineers watched from the pit wall with stopwatches, notebooks, and cups of coffee cooling beside their keyboards.
+// Abstract from “Attention Is All You Need” by Vaswani et al.
+// Source: https://arxiv.org/abs/1706.03762
+const proseCorpus = `The dominant sequence transduction models are based on complex recurrent or convolutional neural networks in an encoder-decoder configuration. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.
 
-The first signal measured responsiveness. A lamp flashed once, and each machine answered with a sharp pulse of light. The second signal measured sustained pace. The cars accelerated together, leaving clean ribbons of sound along the straight. One leapt forward immediately, another gathered speed with remarkable smoothness, and the third held a steady line that seemed almost effortless.
+Experiments on two machine translation tasks show these models to be superior in quality while being more parallelizable and requiring significantly less time to train. Our model achieves 28.4 BLEU on the WMT 2014 English-to-German translation task, improving over the existing best results, including ensembles by over 2 BLEU.
 
-No single number told the whole story. A quick start could create an early lead, while consistent speed could erase it before the finish. The team therefore recorded the first movement, every interval, and the exact moment each car crossed the line. When the track finally fell quiet, the result was simple enough to read at a glance and detailed enough to study later.`;
+On the WMT 2014 English-to-French translation task, our model establishes a new single-model state-of-the-art BLEU score of 41.8 after training for 3.5 days on eight GPUs, a small fraction of the training costs of the best models from the literature. We show that the Transformer generalizes well to other tasks by applying it successfully to English constituency parsing both with large and limited training data.`;
 
-const codeCorpus = `type Sample = {
-  at: number;
-  tokens: number;
-};
+// nanoGPT's causal self-attention forward pass. The source is MIT-licensed.
+// Source: https://github.com/karpathy/nanoGPT/blob/master/model.py
+const codeCorpus = `def forward(self, x):
+    B, T, C = x.size() # batch size, sequence length, embedding dimensionality (n_embd)
 
-export function summarize(samples: Sample[]) {
-  if (samples.length < 2) {
-    return { durationMs: 0, tokens: 0, tps: 0 };
-  }
+    # calculate query, key, values for all heads in batch and move head forward to be the batch dim
+    q, k, v = self.c_attn(x).split(self.n_embd, dim=2)
+    k = k.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
+    q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
+    v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
 
-  const ordered = [...samples].sort((a, b) => a.at - b.at);
-  const first = ordered[0];
-  const last = ordered[ordered.length - 1];
-  const durationMs = Math.max(1, last.at - first.at);
-  const tokens = ordered.reduce((total, sample) => total + sample.tokens, 0);
+    # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
+    if self.flash:
+        # efficient attention using Flash Attention CUDA kernels
+        y = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=None, dropout_p=self.dropout if self.training else 0, is_causal=True)
+    else:
+        # manual implementation of attention
+        att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
+        att = att.masked_fill(self.bias[:,:,:T,:T] == 0, float('-inf'))
+        att = F.softmax(att, dim=-1)
+        att = self.attn_dropout(att)
+        y = att @ v # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
 
-  return {
-    durationMs,
-    tokens,
-    tps: Number((tokens / (durationMs / 1000)).toFixed(2)),
-  };
-}
+    y = y.transpose(1, 2).contiguous().view(B, T, C) # re-assemble all head outputs side by side
 
-export async function race<T>(jobs: Array<() => Promise<T>>) {
-  const startedAt = performance.now();
-  const results = await Promise.all(
-    jobs.map(async (job, lane) => {
-      const readyAt = performance.now();
-      const value = await job();
-      const finishedAt = performance.now();
-      return {
-        lane,
-        value,
-        setupMs: readyAt - startedAt,
-        elapsedMs: finishedAt - startedAt,
-      };
-    }),
-  );
-
-  return results.sort((a, b) => a.elapsedMs - b.elapsedMs);
-}`;
+    # output projection
+    y = self.resid_dropout(self.c_proj(y))
+    return y`;
 
 function makePrompt(corpus: string): string {
   return [
@@ -67,8 +56,8 @@ function makePrompt(corpus: string): string {
 }
 
 export const workloads: Workload[] = [
-  { id: "prose", name: "Prose heat", corpus: proseCorpus, prompt: makePrompt(proseCorpus) },
-  { id: "code", name: "Code heat", corpus: codeCorpus, prompt: makePrompt(codeCorpus) },
+  { id: "prose", name: "Attention Is All You Need", corpus: proseCorpus, prompt: makePrompt(proseCorpus) },
+  { id: "code", name: "nanoGPT causal self-attention", corpus: codeCorpus, prompt: makePrompt(codeCorpus) },
 ];
 
 export function validateOutput(output: string, expected: string): { valid: boolean; message?: string } {
