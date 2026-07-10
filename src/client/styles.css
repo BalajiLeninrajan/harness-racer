@@ -655,7 +655,7 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
 .setup-panel .panel-heading { min-height: 64px; padding-inline: 0; }
 .setup-panel .step { width: 25px; height: 25px; border-radius: 7px; box-shadow: none; }
 .setup-panel .panel-heading h2 { font-size: 16px; }
-.competitor-list { gap: 0; padding: 4px 0; }
+.competitor-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 14px; padding: 4px 0; }
 .competitor-card {
   grid-template-columns: minmax(0, 1fr) 34px;
   grid-template-rows: auto;
@@ -671,8 +671,8 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
 .competitor-card::before { inset: 17px auto 17px -10px; width: 2px; box-shadow: none; }
 .remove-button { grid-column: 2; grid-row: 1; align-self: center; }
 .add-competitor {
-  min-height: 48px;
-  margin-top: 4px;
+  min-height: 58px;
+  margin: 13px 0;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -705,7 +705,7 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
 .racer-picker-copy strong, .racer-picker-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .racer-picker-copy strong { font-size: 14px; }
 .racer-picker-copy small { color: var(--overlay-2); font: 550 10px/1 var(--mono); }
-.racer-picker-popover { position: absolute; z-index: 100; top: calc(100% + 7px); left: 0; width: min(640px, calc(100vw - 32px)); height: min(430px, calc(100vh - 150px)); display: grid; grid-template-columns: 68px minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--surface-1); border-radius: 13px; background: var(--base); box-shadow: 10px 14px 30px rgb(17 17 27 / .72); }
+.racer-picker-popover { position: fixed; z-index: 100; top: 50%; left: 50%; width: min(720px, calc(100vw - 40px)); height: min(70dvh, 560px); display: grid; grid-template-columns: 68px minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr); overflow: hidden; transform: translate(-50%, -50%); border: 1px solid var(--surface-1); border-radius: 13px; background: var(--base); box-shadow: 0 24px 70px rgb(17 17 27 / .82); }
 .racer-picker-sidebar { grid-column: 1; grid-row: 1 / 3; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 5px; border-right: 1px solid var(--surface-0); background: color-mix(in srgb, var(--mantle) 48%, var(--base)); }
 .racer-picker-sidebar button { width: 44px; height: 44px; display: grid; place-items: center; position: relative; color: var(--overlay-1); border: 0; border-radius: 9px; background: transparent; cursor: pointer; }
 .racer-picker-sidebar button:hover { color: var(--text); background: color-mix(in srgb, var(--surface-0) 72%, transparent); }
@@ -786,7 +786,7 @@ footer { min-height: 82px; border-top-color: color-mix(in srgb, var(--surface-1)
   .page-context { display: none; }
   .hero { grid-template-columns: 1fr; }
   .hero-track { grid-column: 1; grid-row: auto; min-height: 130px; margin-top: 28px; transform: none; }
-  .competitor-list { grid-template-columns: 1fr; }
+  .competitor-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .finish-deck { grid-template-columns: 1fr; }
   .runner-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .about-hero { grid-template-columns: 1fr; }
@@ -897,11 +897,10 @@ footer { min-height: 82px; border-top-color: color-mix(in srgb, var(--surface-1)
   .hero { margin-bottom: 30px; }
   .hero > p { font-size: 14px; }
   .setup-panel .panel-heading { padding-inline: 0; }
-  .competitor-list { padding-inline: 0; }
+  .competitor-list { grid-template-columns: 1fr; padding-inline: 0; }
   .competitor-card { grid-template-columns: minmax(0, 1fr) 32px; grid-template-rows: auto; padding: 11px 0; }
   .remove-button { grid-column: 2; grid-row: 1; }
   .racer-picker { grid-column: 1; }
-  .racer-picker-popover { left: 0; width: calc(100vw - 32px); }
   .race-options { padding-inline: 0; }
   .panel-footer { padding-inline: 0; }
   .review-meta { grid-template-columns: 1fr 1fr 1fr; }
@@ -918,7 +917,7 @@ footer { min-height: 82px; border-top-color: color-mix(in srgb, var(--surface-1)
   .racer-picker-trigger { min-height: 56px; padding-inline: 9px; }
   .racer-picker-logo { width: 32px; height: 32px; }
   .racer-picker-copy small { max-width: 180px; }
-  .racer-picker-popover { position: fixed; inset: auto 12px 12px; width: auto; height: min(72dvh, 560px); grid-template-columns: 1fr; grid-template-rows: 52px 52px minmax(0, 1fr); }
+  .racer-picker-popover { position: fixed; inset: auto 12px 12px; width: auto; height: min(72dvh, 560px); grid-template-columns: 1fr; grid-template-rows: 52px 52px minmax(0, 1fr); transform: none; }
   .racer-picker-sidebar { grid-column: 1; grid-row: 1; padding: 5px 8px; flex-direction: row; justify-content: flex-start; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--surface-0); }
   .racer-picker-sidebar button { width: 40px; height: 40px; flex: 0 0 auto; }
   .racer-picker-sidebar button.active::after { inset: auto 8px -5px; width: auto; height: 3px; border-radius: 4px 4px 0 0; }
