@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { BenchmarkRequest, ServerEvent } from "../shared/types.js";
-import type { HarnessAdapter } from "./adapters/types.js";
-import { runBenchmark } from "./benchmark.js";
+import type { HarnessAdapter } from "../src/server/adapters/types.js";
+import { runBenchmark } from "../src/server/benchmark.js";
+import type { BenchmarkRequest, ServerEvent } from "../src/shared/types.js";
 
 function fakeAdapter(id: "codex" | "cursor", delayMs: number): HarnessAdapter {
   return {

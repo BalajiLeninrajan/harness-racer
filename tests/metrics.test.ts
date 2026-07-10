@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Competitor, RunResult } from "../shared/types.js";
-import { countNormalizedTokens, median, summarizeResults } from "./metrics.js";
+import { countNormalizedTokens, median, summarizeResults } from "../src/server/metrics.js";
+import type { Competitor, RunResult } from "../src/shared/types.js";
 
 const competitors: Competitor[] = [
   { id: "a", harness: "codex", model: "alpha", label: "Alpha", color: "#fff" },

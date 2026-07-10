@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateOutput, workloads } from "./workloads.js";
+import { validateOutput, workloads } from "../src/server/workloads.js";
 
 describe("workloads", () => {
   it("contains separate deterministic prose and code heats", () => {
