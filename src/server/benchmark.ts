@@ -75,7 +75,7 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
         lastDeltaAt = now;
         deltaCount += 1;
         output += text;
-        const streamMs = Math.max(1, now - firstDeltaAt);
+        const visibleStreamMs = Math.max(1, now - firstDeltaAt);
         const tokens = countNormalizedTokens(output);
         emit({
           type: "run.delta",
@@ -84,7 +84,7 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
           sample,
           text,
           elapsedMs: now - startedAt,
-          ...(deltaCount > 1 ? { liveTps: tokens / (streamMs / 1000) } : {}),
+          ...(deltaCount > 1 ? { liveVisibleTokensPerSecond: tokens / (visibleStreamMs / 1000) } : {}),
         });
       },
     });
@@ -93,9 +93,9 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
       throw new Error("The agent completed without streaming visible text.");
     }
 
-    const normalizedTokens = countNormalizedTokens(output);
-    const streamMs = Math.max(1, lastDeltaAt - firstDeltaAt);
-    const modelTtftMs = firstDeltaAt - startedAt;
+    const visibleTokens = countNormalizedTokens(output);
+    const visibleStreamMs = Math.max(1, lastDeltaAt - firstDeltaAt);
+    const promptToFirstOutputMs = firstDeltaAt - startedAt;
     const validation = validateOutput(output, workload.corpus);
     const result: RunResult = {
       competitorId: competitor.id,
@@ -107,20 +107,20 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
       ...(!validation.valid
         ? { validationMessage: validation.message }
         : deltaCount <= 1
-          ? { validationMessage: "Output arrived as one buffered chunk, so streaming TPS is not measurable." }
+          ? { validationMessage: "Output arrived as one buffered chunk, so visible streaming speed is not measurable." }
           : {}),
       metrics: {
-        setupMs: readyAt - launchedAt,
-        modelTtftMs,
-        coldTtftMs: readyAt - launchedAt + modelTtftMs,
-        streamMs,
-        totalMs: lastDeltaAt - startedAt,
-        normalizedTokens,
-        normalizedTps: normalizedTokens / (streamMs / 1000),
+        harnessPrepMs: readyAt - launchedAt,
+        promptToFirstOutputMs,
+        coldStartToFirstOutputMs: readyAt - launchedAt + promptToFirstOutputMs,
+        visibleStreamMs,
+        promptToFinishMs: lastDeltaAt - startedAt,
+        visibleTokens,
+        visibleTokensPerSecond: visibleTokens / (visibleStreamMs / 1000),
         ...(adapterResult.nativeOutputTokens !== undefined
           ? { nativeOutputTokens: adapterResult.nativeOutputTokens }
           : {}),
-        deltaCount,
+        streamChunkCount: deltaCount,
       },
     };
 

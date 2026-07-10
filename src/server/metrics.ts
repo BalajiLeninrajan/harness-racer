@@ -29,33 +29,33 @@ export function summarizeResults(competitors: Competitor[], results: RunResult[]
     return {
       competitor,
       validRuns: valid.length,
-      modelTtftMs: median(valid.map((result) => result.metrics.modelTtftMs)),
-      coldTtftMs: median(valid.map((result) => result.metrics.coldTtftMs)),
-      totalMs: median(valid.map((result) => result.metrics.totalMs)),
-      normalizedTps: median(valid.map((result) => result.metrics.normalizedTps)),
-      overallRank: 0,
+      promptToFirstOutputMs: median(valid.map((result) => result.metrics.promptToFirstOutputMs)),
+      coldStartToFirstOutputMs: median(valid.map((result) => result.metrics.coldStartToFirstOutputMs)),
+      promptToFinishMs: median(valid.map((result) => result.metrics.promptToFinishMs)),
+      visibleTokensPerSecond: median(valid.map((result) => result.metrics.visibleTokensPerSecond)),
+      finishRank: 0,
       crowns: [] as SummaryRow["crowns"],
     };
   }).filter((row) => row.validRuns > 0);
 
   if (rows.length === 0) return [];
 
-  const ranked = [...rows].sort((a, b) => a.totalMs - b.totalMs);
+  const ranked = [...rows].sort((a, b) => a.promptToFinishMs - b.promptToFinishMs);
   ranked.forEach((row, index) => {
-    row.overallRank = index + 1;
+    row.finishRank = index + 1;
   });
 
-  const bestTotal = Math.min(...rows.map((row) => row.totalMs));
-  const bestModelTtft = Math.min(...rows.map((row) => row.modelTtftMs));
-  const bestColdTtft = Math.min(...rows.map((row) => row.coldTtftMs));
-  const bestTps = Math.max(...rows.map((row) => (Number.isFinite(row.normalizedTps) ? row.normalizedTps : 0)));
+  const bestFinish = Math.min(...rows.map((row) => row.promptToFinishMs));
+  const bestFirstOutput = Math.min(...rows.map((row) => row.promptToFirstOutputMs));
+  const bestColdStart = Math.min(...rows.map((row) => row.coldStartToFirstOutputMs));
+  const bestVisibleSpeed = Math.max(...rows.map((row) => (Number.isFinite(row.visibleTokensPerSecond) ? row.visibleTokensPerSecond : 0)));
 
   for (const row of rows) {
-    if (withinOnePercent(row.totalMs, bestTotal)) row.crowns.push("overall");
-    if (withinOnePercent(row.modelTtftMs, bestModelTtft)) row.crowns.push("modelTtft");
-    if (withinOnePercent(row.coldTtftMs, bestColdTtft)) row.crowns.push("coldTtft");
-    if (withinOnePercent(row.normalizedTps, bestTps)) row.crowns.push("tps");
+    if (withinOnePercent(row.promptToFinishMs, bestFinish)) row.crowns.push("finish");
+    if (withinOnePercent(row.promptToFirstOutputMs, bestFirstOutput)) row.crowns.push("firstOutput");
+    if (withinOnePercent(row.coldStartToFirstOutputMs, bestColdStart)) row.crowns.push("coldStart");
+    if (withinOnePercent(row.visibleTokensPerSecond, bestVisibleSpeed)) row.crowns.push("visibleSpeed");
   }
 
-  return rows.sort((a, b) => a.overallRank - b.overallRank);
+  return rows.sort((a, b) => a.finishRank - b.finishRank);
 }

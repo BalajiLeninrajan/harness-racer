@@ -16,6 +16,7 @@ import {
   Plus,
   Radio,
   RotateCcw,
+  Info,
   Sparkles,
   Terminal,
   Trophy,
@@ -24,6 +25,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { About } from "./About";
 import { HarnessPicker } from "./HarnessPicker";
 import { ModelPicker } from "./ModelPicker";
 import type {
@@ -40,6 +42,7 @@ import type {
 } from "../shared/types";
 
 type Phase = "setup" | "review" | "running" | "results";
+type Page = "benchmark" | "about";
 type SocketState = "connecting" | "open" | "closed";
 
 interface LaneState {
@@ -51,9 +54,9 @@ interface LaneState {
   warmup?: boolean;
   setupStartedAt?: number;
   runningStartedAt?: number;
-  setupMs?: number;
-  ttftMs?: number;
-  liveTps?: number;
+  harnessPrepMs?: number;
+  firstOutputMs?: number;
+  liveVisibleTokensPerSecond?: number;
   completedRuns: number;
   error?: string;
 }
@@ -84,7 +87,7 @@ const formatMs = (value?: number) => {
   return value >= 1000 ? `${(value / 1000).toFixed(value >= 10_000 ? 1 : 2)}s` : `${Math.round(value)}ms`;
 };
 
-const formatTps = (value?: number) =>
+const formatVisibleRate = (value?: number) =>
   value === undefined || !Number.isFinite(value) ? "—" : `${value.toFixed(value >= 100 ? 0 : 1)}`;
 
 const ordinal = (rank: number) => {
@@ -168,6 +171,7 @@ export function App() {
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [mode, setMode] = useState<RunMode>(() => (localStorage.getItem("tps-racer.mode") as RunMode) || "parallel");
   const [preset, setPreset] = useState<SamplePreset>(() => (localStorage.getItem("tps-racer.preset") as SamplePreset) || "standard");
+  const [page, setPage] = useState<Page>("benchmark");
   const [phase, setPhase] = useState<Phase>("setup");
   const [socketState, setSocketState] = useState<SocketState>("connecting");
   const [lanes, setLanes] = useState<Record<string, LaneState>>({});
@@ -287,9 +291,9 @@ export function App() {
             status: event.status,
             statusMessage: event.message,
             error: event.status === "error" ? event.message : undefined,
-            liveTps: newRun ? undefined : previous.liveTps,
-            ttftMs: newRun ? undefined : previous.ttftMs,
-            setupMs: event.status === "ready" && previous.setupStartedAt ? time - previous.setupStartedAt : newRun ? undefined : previous.setupMs,
+            liveVisibleTokensPerSecond: newRun ? undefined : previous.liveVisibleTokensPerSecond,
+            firstOutputMs: newRun ? undefined : previous.firstOutputMs,
+            harnessPrepMs: event.status === "ready" && previous.setupStartedAt ? time - previous.setupStartedAt : newRun ? undefined : previous.harnessPrepMs,
             setupStartedAt: event.status === "starting" ? time : newRun ? previous.setupStartedAt : previous.setupStartedAt,
             runningStartedAt: event.status === "running" ? time : newRun ? undefined : previous.runningStartedAt,
           },
@@ -309,8 +313,8 @@ export function App() {
             status: "running",
             workload: event.workload,
             sample: event.sample,
-            ttftMs: previous.ttftMs ?? event.elapsedMs,
-            liveTps: event.liveTps ?? previous.liveTps,
+            firstOutputMs: previous.firstOutputMs ?? event.elapsedMs,
+            liveVisibleTokensPerSecond: event.liveVisibleTokensPerSecond ?? previous.liveVisibleTokensPerSecond,
           },
         };
       });
@@ -328,9 +332,9 @@ export function App() {
             ...previous,
             output: event.result.output || previous.output,
             status: "complete",
-            setupMs: event.result.metrics.setupMs,
-            ttftMs: event.result.metrics.modelTtftMs,
-            liveTps: event.result.metrics.normalizedTps,
+            harnessPrepMs: event.result.metrics.harnessPrepMs,
+            firstOutputMs: event.result.metrics.promptToFirstOutputMs,
+            liveVisibleTokensPerSecond: event.result.metrics.visibleTokensPerSecond,
             completedRuns: previous.completedRuns + 1,
             error: event.result.valid ? undefined : event.result.validationMessage,
           },
@@ -355,7 +359,7 @@ export function App() {
 
     if (event.type === "benchmark.complete") {
       setResults(event.results);
-      setSummary([...event.summary].sort((a, b) => a.overallRank - b.overallRank));
+      setSummary([...event.summary].sort((a, b) => a.finishRank - b.finishRank));
       setCompletedRuns(event.results.length);
       setPhase("results");
       setNotice(undefined);
@@ -383,7 +387,7 @@ export function App() {
   const activeWorkload = Object.values(lanes).find((lane) => lane.status === "running" || lane.status === "starting")?.workload;
   const invalidResults = results.filter((result) => !result.valid && !result.warmup);
   const winner = summary[0];
-  const winningMargin = winner && summary[1] ? Math.max(0, summary[1].totalMs - winner.totalMs) : undefined;
+  const winningMargin = winner && summary[1] ? Math.max(0, summary[1].promptToFinishMs - winner.promptToFinishMs) : undefined;
 
   function updateCompetitor(id: string, patch: Partial<Competitor>) {
     setCompetitors((current) => current.map((competitor) => (competitor.id === id ? { ...competitor, ...patch } : competitor)));
@@ -457,37 +461,43 @@ export function App() {
       <div className="ambient ambient-one" />
       <div className="ambient ambient-two" />
       <header className="topbar">
-        <button className="brand" disabled={phase === "running"} onClick={() => setPhase("setup")} aria-label="TPS Racer home">
+        <button className="brand" disabled={phase === "running"} onClick={() => { setPage("benchmark"); setPhase("setup"); }} aria-label="TPS Racer home">
           <span className="brand-icon"><Gauge size={19} /></span>
           <span><b>tps</b>.racer</span>
           <span className="version">local</span>
         </button>
-        <div className="phase-track" aria-label="Benchmark progress">
-          <span className={phase === "setup" ? "active" : "done"}><i>1</i>Grid</span>
-          <b />
-          <span className={phase === "review" ? "active" : phase === "running" || phase === "results" ? "done" : ""}><i>2</i>Check</span>
-          <b />
-          <span className={phase === "running" ? "active" : phase === "results" ? "done" : ""}><i>3</i>Race</span>
-          <b />
-          <span className={phase === "results" ? "active" : ""}><i>4</i>Finish</span>
+        <div className={page === "about" ? "page-context" : "phase-track"} aria-label={page === "about" ? "Current page" : "Benchmark progress"}>
+          {page === "about" ? <><Info size={13} /> Methodology</> : <>
+            <span className={phase === "setup" ? "active" : "done"}><i>1</i>Grid</span>
+            <b />
+            <span className={phase === "review" ? "active" : phase === "running" || phase === "results" ? "done" : ""}><i>2</i>Check</span>
+            <b />
+            <span className={phase === "running" ? "active" : phase === "results" ? "done" : ""}><i>3</i>Race</span>
+            <b />
+            <span className={phase === "results" ? "active" : ""}><i>4</i>Finish</span>
+          </>}
         </div>
-        <div className={`connection connection-${socketState}`} role="status">
-          {socketState === "open" ? <Wifi size={14} /> : socketState === "connecting" ? <LoaderCircle className="spin" size={14} /> : <WifiOff size={14} />}
-          {socketState === "open" ? "engine ready" : socketState === "connecting" ? "waking up" : "engine offline"}
+        <div className="topbar-actions">
+          <button className={`about-button ${page === "about" ? "active" : ""}`} disabled={phase === "running"} onClick={() => setPage(page === "about" ? "benchmark" : "about")}><Info size={14} /> {page === "about" ? "Back to race" : "Methodology"}</button>
+          <div className={`connection connection-${socketState}`} role="status">
+            {socketState === "open" ? <Wifi size={14} /> : socketState === "connecting" ? <LoaderCircle className="spin" size={14} /> : <WifiOff size={14} />}
+            {socketState === "open" ? "engine ready" : socketState === "connecting" ? "waking up" : "engine offline"}
+          </div>
         </div>
       </header>
 
       <main>
+        {page === "about" ? <About onBack={() => setPage("benchmark")} /> : <>
         {phase === "setup" && (
           <section className="setup-view page-enter">
             <div className="hero">
               <div className="eyebrow"><span className="live-dot" /> BENCHMARKS, BUT MAKE IT A RACE</div>
               <h1>Pick your ponies.<br /><em>Let the tokens fly.</em></h1>
-              <p>Same prompt. Same starting gun. Your local coding models sprint side by side while we clock first token and streaming speed.</p>
+              <p>Same prompt. Same starting gun. Your harness + model stacks sprint side by side while we clock visible responsiveness and streaming speed.</p>
               <div className="hero-stats">
-                <span><Zap size={15} /> tokens / sec</span>
-                <span><Clock3 size={15} /> first-token time</span>
-                <span><Terminal size={15} /> your local agents</span>
+                <span><Zap size={15} /> visible tokens / sec</span>
+                <span><Clock3 size={15} /> prompt → first output</span>
+                <span><Terminal size={15} /> harness + model stacks</span>
               </div>
               <div className="hero-track" aria-hidden="true">
                 <span style={{ "--track-color": "#cba6f7", "--track-offset": "13%" } as React.CSSProperties}><i /></span>
@@ -639,8 +649,8 @@ export function App() {
             <div className="race-lanes">
               {competitors.map((competitor, index) => {
                 const lane = lanes[competitor.id] ?? emptyLane();
-                const elapsedSetup = lane.status === "starting" && lane.setupStartedAt ? now - lane.setupStartedAt : lane.setupMs;
-                const elapsedTtft = lane.status === "running" && lane.ttftMs === undefined && lane.runningStartedAt ? now - lane.runningStartedAt : lane.ttftMs;
+                const elapsedHarnessPrep = lane.status === "starting" && lane.setupStartedAt ? now - lane.setupStartedAt : lane.harnessPrepMs;
+                const elapsedFirstOutput = lane.status === "running" && lane.firstOutputMs === undefined && lane.runningStartedAt ? now - lane.runningStartedAt : lane.firstOutputMs;
                 const laneProgress = Math.min(100, (lane.completedRuns / expectedPerLane) * 100);
                 return (
                   <article className={`race-lane status-${lane.status}`} key={competitor.id} style={{ "--lane-color": competitor.color } as React.CSSProperties}>
@@ -654,9 +664,9 @@ export function App() {
                       </div>
                     </div>
                     <div className="lane-metrics">
-                      <Metric label="SETUP" value={formatMs(elapsedSetup)} />
-                      <Metric label="TTFT" value={formatMs(elapsedTtft)} accent={lane.ttftMs !== undefined} />
-                      <Metric label="LIVE TPS" value={formatTps(lane.liveTps)} accent={lane.liveTps !== undefined} />
+                      <Metric label="HARNESS PREP" value={formatMs(elapsedHarnessPrep)} />
+                      <Metric label="FIRST OUTPUT" value={formatMs(elapsedFirstOutput)} accent={lane.firstOutputMs !== undefined} />
+                      <Metric label="VISIBLE TOK/S" value={formatVisibleRate(lane.liveVisibleTokensPerSecond)} accent={lane.liveVisibleTokensPerSecond !== undefined} />
                     </div>
                     <div className="stream-window">
                       <div className="stream-toolbar">
@@ -681,7 +691,7 @@ export function App() {
               <div>
                 <div className="eyebrow"><Flag size={14} /> CHECKERED FLAG</div>
                 <h1>Photo finish.</h1>
-                <p>Median result across valid paper and Python runs.</p>
+                <p>Median harness + model result across valid paper and Python runs.</p>
               </div>
               <div className="checker-strip" aria-hidden="true" />
             </div>
@@ -690,25 +700,25 @@ export function App() {
               <>
                 <div className="finish-deck">
                   <article className="winner-card" style={{ "--lane-color": winner.competitor.color } as React.CSSProperties}>
-                    <div className="winner-kicker"><Trophy size={16} /> Fastest overall</div>
+                    <div className="winner-kicker"><Trophy size={16} /> Fastest prompt-to-finish</div>
                     <div className="winner-identity">
                       <HarnessMark harness={winner.competitor.harness} />
                       <div><h2>{winner.competitor.label}</h2><span>{winner.competitor.model}</span></div>
                     </div>
-                    <div className="winner-time"><strong>{formatMs(winner.totalMs)}</strong><span>median finish</span></div>
+                    <div className="winner-time"><strong>{formatMs(winner.promptToFinishMs)}</strong><span>median prompt → finish</span></div>
                     <div className="winner-metrics">
-                      <span><small>TTFT</small><b>{formatMs(winner.modelTtftMs)}</b></span>
-                      <span><small>TPS</small><b>{formatTps(winner.normalizedTps)}</b></span>
+                      <span><small>PROMPT → FIRST</small><b>{formatMs(winner.promptToFirstOutputMs)}</b></span>
+                      <span><small>VISIBLE TOK/S</small><b>{formatVisibleRate(winner.visibleTokensPerSecond)}</b></span>
                       <span><small>MARGIN</small><b>{winningMargin === undefined ? "solo" : `−${formatMs(winningMargin)}`}</b></span>
                     </div>
                   </article>
                   <div className="runner-stack">
                     {summary.slice(1, 3).map((row) => (
                       <article className="runner-card" key={row.competitor.id} style={{ "--lane-color": row.competitor.color } as React.CSSProperties}>
-                        <span className="runner-place">{ordinal(row.overallRank)}</span>
+                        <span className="runner-place">{ordinal(row.finishRank)}</span>
                         <HarnessMark harness={row.competitor.harness} />
                         <div><strong>{row.competitor.label}</strong><small>{row.competitor.model}</small></div>
-                        <b>{formatMs(row.totalMs)}</b>
+                        <b>{formatMs(row.promptToFinishMs)}</b>
                       </article>
                     ))}
                   </div>
@@ -718,17 +728,17 @@ export function App() {
                   <div className="table-title"><div><Flag size={18} /><h2>Full classification</h2></div><span>{results.filter((result) => result.valid && !result.warmup).length} valid runs</span></div>
                   <div className="table-scroll">
                     <table>
-                      <caption>Complete benchmark results ranked by median total time</caption>
-                      <thead><tr><th scope="col">Place</th><th scope="col">Racer</th><th scope="col">TTFT</th><th scope="col">Cold TTFT</th><th scope="col">TPS</th><th scope="col">Total</th><th scope="col">Runs</th></tr></thead>
+                      <caption>Harness and model stacks ranked by median prompt-to-finish time</caption>
+                      <thead><tr><th scope="col">Place</th><th scope="col">Harness + model</th><th scope="col">Prompt → first</th><th scope="col">Cold start → first</th><th scope="col">Visible tok/s</th><th scope="col">Prompt → finish</th><th scope="col">Runs</th></tr></thead>
                       <tbody>
                         {summary.map((row) => (
                           <tr key={row.competitor.id}>
-                            <td><span className={`position-badge position-${row.overallRank}`}>{row.overallRank}</span></td>
+                            <td><span className={`position-badge position-${row.finishRank}`}>{row.finishRank}</span></td>
                             <td><div className="table-racer"><span className="table-lane-swatch" style={{ background: row.competitor.color }} /><HarnessMark harness={row.competitor.harness} /><div><strong>{row.competitor.label}</strong><small>{row.competitor.model}</small></div></div></td>
-                            <td className={row.crowns.includes("modelTtft") ? "crowned" : ""}>{formatMs(row.modelTtftMs)}{row.crowns.includes("modelTtft") && <span className="best-chip">best</span>}</td>
-                            <td className={row.crowns.includes("coldTtft") ? "crowned" : ""}>{formatMs(row.coldTtftMs)}{row.crowns.includes("coldTtft") && <span className="best-chip">best</span>}</td>
-                            <td className={row.crowns.includes("tps") ? "crowned" : ""}>{formatTps(row.normalizedTps)}{row.crowns.includes("tps") && <span className="best-chip">best</span>}</td>
-                            <td className={row.crowns.includes("overall") ? "crowned" : ""}>{formatMs(row.totalMs)}{row.crowns.includes("overall") && <span className="best-chip">best</span>}</td>
+                            <td className={row.crowns.includes("firstOutput") ? "crowned" : ""}>{formatMs(row.promptToFirstOutputMs)}{row.crowns.includes("firstOutput") && <span className="best-chip">best</span>}</td>
+                            <td className={row.crowns.includes("coldStart") ? "crowned" : ""}>{formatMs(row.coldStartToFirstOutputMs)}{row.crowns.includes("coldStart") && <span className="best-chip">best</span>}</td>
+                            <td className={row.crowns.includes("visibleSpeed") ? "crowned" : ""}>{formatVisibleRate(row.visibleTokensPerSecond)}{row.crowns.includes("visibleSpeed") && <span className="best-chip">best</span>}</td>
+                            <td className={row.crowns.includes("finish") ? "crowned" : ""}>{formatMs(row.promptToFinishMs)}{row.crowns.includes("finish") && <span className="best-chip">best</span>}</td>
                             <td><span className="run-count">{row.validRuns}</span></td>
                           </tr>
                         ))}
@@ -763,9 +773,10 @@ export function App() {
             </div>
           </section>
         )}
+        </>}
       </main>
 
-      <footer><span>TPS RACER</span><p>Local benchmark · normalized visible tokens · lower TTFT is better</p></footer>
+      <footer><span>TPS RACER</span><p>Harness + model benchmark · normalized visible output · local conditions included</p><button disabled={phase === "running"} onClick={() => setPage(page === "about" ? "benchmark" : "about")}>{page === "about" ? "Back to race" : "Read the methodology"}</button></footer>
     </div>
   );
 }
