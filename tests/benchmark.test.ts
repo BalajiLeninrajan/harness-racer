@@ -11,9 +11,6 @@ function fakeAdapter(id: "codex" | "cursor", delayMs: number): HarnessAdapter {
     async probe() {
       return { id, name: id, command: id, installed: true, authenticated: true, models: [] };
     },
-    async listModels() {
-      return [];
-    },
     async run(input) {
       input.onReady();
       await input.waitForStart();

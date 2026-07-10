@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Server as HttpServer } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
-import type { BenchmarkRequest, ClientMessage, ServerEvent } from "../shared/types.js";
+import { isHarnessId, type BenchmarkRequest, type ClientMessage, type ServerEvent } from "../shared/types.js";
 import { adapters } from "./adapters/index.js";
 import { runBenchmark } from "./benchmark.js";
 
@@ -40,7 +40,7 @@ function isBenchmarkRequest(value: unknown): value is BenchmarkRequest {
       (competitor) =>
         competitor &&
         typeof competitor.id === "string" &&
-        (competitor.harness === "codex" || competitor.harness === "claudeAgent" || competitor.harness === "cursor" || competitor.harness === "grok" || competitor.harness === "opencode") &&
+        isHarnessId(competitor.harness) &&
         typeof competitor.model === "string" &&
         competitor.model.length > 0,
     )
