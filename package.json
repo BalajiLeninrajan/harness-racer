@@ -1,0 +1,60 @@
+{
+  "name": "tps-racer",
+  "version": "0.1.0",
+  "description": "Race local coding-agent models and compare TTFT and streaming TPS in your browser.",
+  "type": "module",
+  "bin": {
+    "tps-racer": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "tsx src/cli.ts --dev",
+    "benchmark": "tsx src/cli.ts --dev",
+    "build": "vite build && tsup",
+    "start": "node dist/cli.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "codex",
+    "claude",
+    "cursor",
+    "grok",
+    "opencode",
+    "benchmark",
+    "tps",
+    "ttft"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.205",
+    "@opencode-ai/sdk": "^1.15.13",
+    "js-tiktoken": "^1.0.21",
+    "lucide-react": "^0.564.0",
+    "open": "^11.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sirv": "^3.0.2",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^6.0.0",
+    "tsx": "^4.21.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0",
+    "vitest": "^4.0.18"
+  },
+  "packageManager": "pnpm@11.7.0"
+}
