@@ -14,7 +14,6 @@ import {
   Plus,
   RotateCcw,
   Info,
-  Trophy,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -372,8 +371,6 @@ export function App() {
   const activeWorkload = Object.values(lanes).find((lane) => lane.status === "running" || lane.status === "starting")?.workload;
   const invalidResults = results.filter((result) => !result.valid && !result.warmup);
   const eligibleSummary = summary.filter((row) => !row.disqualified);
-  const winner = eligibleSummary[0];
-  const winningMargin = winner && eligibleSummary[1] ? Math.max(0, eligibleSummary[1].promptToFinishMs - winner.promptToFinishMs) : undefined;
 
   function updateCompetitor(id: string, patch: Partial<Competitor>) {
     setCompetitors((current) => current.map((competitor) => (competitor.id === id ? { ...competitor, ...patch } : competitor)));
@@ -448,8 +445,6 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <div className="ambient ambient-one" />
-      <div className="ambient ambient-two" />
       <header className="topbar">
         <button className="brand" disabled={phase === "running"} onClick={() => { setPage("benchmark"); setPhase("setup"); }} aria-label="TPS Racer home">
           <span className="brand-icon"><Gauge size={19} /></span>
@@ -645,36 +640,28 @@ export function App() {
                 <h1>Photo finish.</h1>
                 <p>Median harness + model result across valid paper and Python runs.</p>
               </div>
-              <div className="checker-strip" aria-hidden="true" />
             </div>
 
-            {winner ? (
-              <div className="finish-deck">
-                <article className="winner-card" style={{ "--lane-color": winner.competitor.color } as React.CSSProperties}>
-                  <div className="winner-kicker"><Trophy size={16} /> Fastest prompt-to-finish</div>
-                  <div className="winner-identity">
-                    <ModelMark harness={winner.competitor.harness} model={winner.competitor.model} />
-                    <div><h2>{winner.competitor.label}</h2><span>{winner.competitor.model}</span></div>
-                  </div>
-                  <div className="winner-time"><strong>{formatMs(winner.promptToFinishMs)}</strong><span>median prompt → finish</span></div>
-                  <div className="winner-metrics">
-                    <span><small>PROMPT → FIRST</small><b>{formatMs(winner.promptToFirstOutputMs)}</b></span>
-                    <span><small>VISIBLE TOK/S</small><b>{formatVisibleRate(winner.visibleTokensPerSecond)}</b></span>
-                    <span><small>MARGIN</small><b>{winningMargin === undefined ? "solo" : `−${formatMs(winningMargin)}`}</b></span>
-                  </div>
-                </article>
-                <div className="runner-stack">
-                  {eligibleSummary.slice(1, 3).map((row) => (
-                    <article className="runner-card" key={row.competitor.id} style={{ "--lane-color": row.competitor.color } as React.CSSProperties}>
-                      <span className="runner-place">{ordinal(row.finishRank)}</span>
-                      <ModelMark harness={row.competitor.harness} model={row.competitor.model} />
-                      <div><strong>{row.competitor.label}</strong><small>{row.competitor.model}</small></div>
-                      <b>{formatMs(row.promptToFinishMs)}</b>
-                    </article>
+            {eligibleSummary.length >= 3 && (
+              <div className="podium-showcase">
+                <ol className="podium-grid" aria-label="Top three finishers">
+                  {eligibleSummary.slice(0, 3).map((row) => (
+                    <li className={`podium-entry rank-${row.finishRank}`} key={row.competitor.id} style={{ "--lane-color": row.competitor.color } as React.CSSProperties}>
+                      <div className="podium-identity">
+                        <span className="podium-rank">{ordinal(row.finishRank)}</span>
+                        <ModelMark harness={row.competitor.harness} model={row.competitor.model} />
+                        <strong>{row.competitor.label}</strong>
+                        <small>{row.competitor.model}</small>
+                        <b>{formatMs(row.promptToFinishMs)}</b>
+                      </div>
+                      <div className="podium-step" aria-hidden="true"><span>{row.finishRank}</span></div>
+                    </li>
                   ))}
-                </div>
+                </ol>
               </div>
-            ) : (
+            )}
+
+            {eligibleSummary.length === 0 && (
               <div className="empty-state panel"><AlertCircle /><strong>No eligible finishers</strong><span>Recorded results are shown below as disqualified.</span></div>
             )}
 
