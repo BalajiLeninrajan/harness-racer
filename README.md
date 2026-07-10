@@ -43,7 +43,7 @@ TPS Racer intentionally measures the complete local experience: harness, model, 
 
 Only exact, visibly streamed reproductions are valid. Warmups and invalid runs are excluded; reported values are medians across the two fixed workloads. Quick uses one measured run per workload, Standard uses one warmup and three measured runs, and Thorough uses one warmup and five measured runs.
 
-The dashboard's Methodology page documents the measurement boundaries, controls, sampling, and limitations in more detail.
+The dashboard's Methodology page documents the measurement boundaries, controls, sampling, and limitations in more detail. Responses delivered as one chunk or as a callback burst shorter than 50ms are excluded because visible streaming speed is not measurable.
 
 The prose payload is the abstract of [“Attention Is All You Need”](https://arxiv.org/abs/1706.03762) by Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, and Illia Polosukhin. The code payload is the MIT-licensed [`CausalSelfAttention.forward`](https://github.com/karpathy/nanoGPT/blob/master/model.py) excerpt from nanoGPT, copyright Andrej Karpathy.
 

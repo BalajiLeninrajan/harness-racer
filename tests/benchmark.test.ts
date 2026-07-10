@@ -39,7 +39,7 @@ describe("benchmark engine", () => {
 
     await runBenchmark(
       request,
-      [fakeAdapter("codex", 1), fakeAdapter("cursor", 8)],
+      [fakeAdapter("codex", 60), fakeAdapter("cursor", 90)],
       new AbortController().signal,
       (event) => events.push(event),
     );
@@ -52,5 +52,32 @@ describe("benchmark engine", () => {
     expect(completed.summary).toHaveLength(2);
     expect(completed.summary[0].competitor.id).toBe("a");
     expect(completed.summary[0].crowns).toContain("finish");
+  });
+
+  it("excludes responses delivered as a rapid callback burst", async () => {
+    const request: BenchmarkRequest = {
+      type: "start",
+      mode: "sequential",
+      samplePreset: "quick",
+      competitors: [
+        { id: "a", harness: "codex", model: "alpha", label: "Alpha", color: "#fff" },
+      ],
+    };
+    const events: ServerEvent[] = [];
+
+    await runBenchmark(
+      request,
+      [fakeAdapter("codex", 0)],
+      new AbortController().signal,
+      (event) => events.push(event),
+    );
+
+    const completed = events.find((event) => event.type === "benchmark.complete");
+    expect(completed?.type).toBe("benchmark.complete");
+    if (completed?.type !== "benchmark.complete") return;
+    expect(completed.results).toHaveLength(2);
+    expect(completed.results.every((result) => !result.valid)).toBe(true);
+    expect(completed.results.every((result) => result.validationMessage?.includes("burst"))).toBe(true);
+    expect(completed.summary).toEqual([]);
   });
 });

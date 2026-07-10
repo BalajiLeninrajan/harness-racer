@@ -3,6 +3,8 @@ import type { Competitor, RunResult, SummaryRow } from "../shared/types.js";
 
 const tokenizer = getEncoding("o200k_base");
 
+export const MIN_MEASURABLE_STREAM_MS = 50;
+
 export function countNormalizedTokens(text: string): number {
   return tokenizer.encode(text).length;
 }
@@ -14,6 +16,17 @@ export function median(values: number[]): number {
   return ordered.length % 2 === 0
     ? (ordered[middle - 1] + ordered[middle]) / 2
     : ordered[middle];
+}
+
+export function streamAnomalyMessage(deltaCount: number, streamMs: number): string | undefined {
+  if (deltaCount <= 1) {
+    return "Output arrived as one buffered chunk, so visible streaming speed is not measurable.";
+  }
+  if (streamMs < MIN_MEASURABLE_STREAM_MS) {
+    const duration = streamMs < 1 ? "<1ms" : `${Math.floor(streamMs)}ms`;
+    return `Output arrived in a ${duration} burst across ${deltaCount} chunks, so visible streaming speed is not measurable.`;
+  }
+  return undefined;
 }
 
 function withinOnePercent(value: number, best: number): boolean {

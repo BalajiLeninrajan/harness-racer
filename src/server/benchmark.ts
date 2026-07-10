@@ -11,7 +11,7 @@ import type {
   WorkloadId,
 } from "../shared/types.js";
 import type { HarnessAdapter } from "./adapters/types.js";
-import { countNormalizedTokens, summarizeResults } from "./metrics.js";
+import { countNormalizedTokens, streamAnomalyMessage, summarizeResults } from "./metrics.js";
 import { validateOutput, workloads } from "./workloads.js";
 
 const presetRuns: Record<SamplePreset, { warmups: number; measured: number }> = {
@@ -94,20 +94,22 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
     }
 
     const visibleTokens = countNormalizedTokens(output);
-    const visibleStreamMs = Math.max(1, lastDeltaAt - firstDeltaAt);
+    const observedStreamMs = lastDeltaAt - firstDeltaAt;
+    const visibleStreamMs = Math.max(1, observedStreamMs);
     const promptToFirstOutputMs = firstDeltaAt - startedAt;
     const validation = validateOutput(output, workload.corpus);
+    const streamAnomaly = streamAnomalyMessage(deltaCount, observedStreamMs);
     const result: RunResult = {
       competitorId: competitor.id,
       workload: workload.id,
       sample,
       warmup,
       output,
-      valid: validation.valid && deltaCount > 1,
+      valid: validation.valid && streamAnomaly === undefined,
       ...(!validation.valid
         ? { validationMessage: validation.message }
-        : deltaCount <= 1
-          ? { validationMessage: "Output arrived as one buffered chunk, so visible streaming speed is not measurable." }
+        : streamAnomaly
+          ? { validationMessage: streamAnomaly }
           : {}),
       metrics: {
         harnessPrepMs: readyAt - launchedAt,

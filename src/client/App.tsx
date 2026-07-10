@@ -334,7 +334,7 @@ export function App() {
             status: "complete",
             harnessPrepMs: event.result.metrics.harnessPrepMs,
             firstOutputMs: event.result.metrics.promptToFirstOutputMs,
-            liveVisibleTokensPerSecond: event.result.metrics.visibleTokensPerSecond,
+            liveVisibleTokensPerSecond: event.result.valid ? event.result.metrics.visibleTokensPerSecond : undefined,
             completedRuns: previous.completedRuns + 1,
             error: event.result.valid ? undefined : event.result.validationMessage,
           },
@@ -746,25 +746,26 @@ export function App() {
                     </table>
                   </div>
                 </div>
-                {invalidResults.length > 0 && (
-                  <details className="invalid-results panel">
-                    <summary><span><AlertCircle size={15} /> {invalidResults.length} invalid {invalidResults.length === 1 ? "run" : "runs"} excluded</span><ChevronRight size={15} /></summary>
-                    <div>
-                      {invalidResults.map((result, index) => {
-                        const competitor = competitors.find((item) => item.id === result.competitorId);
-                        return (
-                          <p key={`${result.competitorId}-${result.workload}-${result.sample}-${index}`}>
-                            <strong>{competitor?.label ?? "Unknown racer"} · {result.workload} · sample {result.sample}</strong>
-                            <span>{result.validationMessage ?? "The output was not valid for ranking."}</span>
-                          </p>
-                        );
-                      })}
-                    </div>
-                  </details>
-                )}
               </>
             ) : (
               <div className="empty-state panel"><AlertCircle /><strong>No valid finishers</strong><span>Review the run errors and try again.</span></div>
+            )}
+
+            {invalidResults.length > 0 && (
+              <details className="invalid-results panel">
+                <summary><span><AlertCircle size={15} /> {invalidResults.length} invalid {invalidResults.length === 1 ? "run" : "runs"} excluded</span><ChevronRight size={15} /></summary>
+                <div>
+                  {invalidResults.map((result, index) => {
+                    const competitor = competitors.find((item) => item.id === result.competitorId);
+                    return (
+                      <p key={`${result.competitorId}-${result.workload}-${result.sample}-${index}`}>
+                        <strong>{competitor?.label ?? "Unknown racer"} · {result.workload} · sample {result.sample}</strong>
+                        <span>{result.validationMessage ?? "The output was not valid for ranking."}</span>
+                      </p>
+                    );
+                  })}
+                </div>
+              </details>
             )}
 
             <div className="results-actions">
