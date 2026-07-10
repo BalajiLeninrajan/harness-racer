@@ -31,6 +31,8 @@ A normal hosted website cannot directly start local coding-agent CLIs or reuse t
 
 Each run uses an empty temporary directory and asks the agent to reproduce fixed prose and code payloads without tools. Results use a shared `o200k_base` tokenizer so visible TPS is comparable across providers; provider-native token usage is retained only as secondary diagnostics.
 
+The prose payload is the abstract of [“Attention Is All You Need”](https://arxiv.org/abs/1706.03762) by Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, and Illia Polosukhin. The code payload is the MIT-licensed [`CausalSelfAttention.forward`](https://github.com/karpathy/nanoGPT/blob/master/model.py) excerpt from nanoGPT, copyright Andrej Karpathy.
+
 ## Build and test
 
 ```bash

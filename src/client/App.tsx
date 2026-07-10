@@ -592,7 +592,7 @@ export function App() {
               <div className="review-meta">
                 <div><span>START</span><strong>{mode === "parallel" ? "Same gun" : "Time trial"}</strong></div>
                 <div><span>DISTANCE</span><strong>{PRESETS.find((item) => item.id === preset)?.label}</strong></div>
-                <div><span>TRACKS</span><strong>Prose + TypeScript</strong></div>
+                <div><span>TRACKS</span><strong>Attention + nanoGPT</strong></div>
               </div>
               <div className="review-racers">
                 {competitors.map((competitor, index) => (
@@ -623,9 +623,9 @@ export function App() {
               </div>
               <div className="race-header-right">
                 <div className="heat-switcher">
-                  <span className={activeWorkload === "prose" ? "active" : activeWorkload === "code" ? "done" : ""}><span>01</span> Prose</span>
+                  <span className={activeWorkload === "prose" ? "active" : activeWorkload === "code" ? "done" : ""}><span>01</span> Attention paper</span>
                   <i />
-                  <span className={activeWorkload === "code" ? "active" : ""}><span>02</span> TypeScript</span>
+                  <span className={activeWorkload === "code" ? "active" : ""}><span>02</span> nanoGPT attention</span>
                 </div>
                 <button className="cancel-button" onClick={cancelRace}><CircleStop size={15} /> Cancel</button>
               </div>
@@ -660,7 +660,7 @@ export function App() {
                     </div>
                     <div className="stream-window">
                       <div className="stream-toolbar">
-                        <span><Code2 size={13} /> {lane.workload === "code" ? "typescript.ts" : lane.workload === "prose" ? "prose.txt" : "awaiting-stream"}</span>
+                        <span><Code2 size={13} /> {lane.workload === "code" ? "model.py" : lane.workload === "prose" ? "attention.txt" : "awaiting-stream"}</span>
                         <span>{lane.warmup ? "WARMUP" : lane.sample !== undefined ? `SAMPLE ${lane.sample}` : "QUEUED"}</span>
                       </div>
                       <pre ref={(element) => { streamRefs.current[competitor.id] = element; }}>{lane.output || (lane.status === "error" ? lane.error : "Waiting for the green light…")}<span className={lane.status === "running" ? "cursor" : "cursor hidden"} /></pre>
@@ -681,7 +681,7 @@ export function App() {
               <div>
                 <div className="eyebrow"><Flag size={14} /> CHECKERED FLAG</div>
                 <h1>Photo finish.</h1>
-                <p>Median result across valid prose and TypeScript runs.</p>
+                <p>Median result across valid paper and Python runs.</p>
               </div>
               <div className="checker-strip" aria-hidden="true" />
             </div>
