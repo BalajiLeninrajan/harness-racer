@@ -1,6 +1,6 @@
 # TPS Racer
 
-Race the coding-agent stacks already authenticated on your machine. TPS Racer opens a local browser dashboard, streams every response live, and compares harness preparation, prompt-to-first-output, cold-start responsiveness, visible tokens per second, and prompt-to-finish time.
+Race the coding-agent stacks already authenticated on your machine. TPS Racer runs in a local browser dashboard by default or entirely in your terminal with `--cli`, streams every response live, and compares harness preparation, prompt-to-first-output, cold-start responsiveness, visible tokens per second, and prompt-to-finish time.
 
 ## Run locally
 
@@ -11,6 +11,24 @@ pnpm benchmark
 
 The dashboard opens at `http://127.0.0.1:4317`. It shows only harnesses detected on the machine, then lets you pick models and start the race.
 
+## Run in the terminal
+
+Pass `--cli` to run the same benchmark without starting a local web server or opening a browser:
+
+```bash
+pnpm benchmark -- --cli
+```
+
+The terminal flow scans the same local harnesses, lets you choose two to six racers and their models, then asks for the starting mode and sample preset. During the race it prints each heat's progress and finishes with the same median TTFT, cold TTFT, normalized TPS, and total-time ranking as the dashboard.
+
+Once published, the equivalent zero-install command is:
+
+```bash
+pnpm dlx tps-racer@latest --cli
+```
+
+Press `Ctrl-C` during a race to cancel it and clean up the active runs.
+
 ## Distribution
 
 The package is designed for zero-install use after publication:
@@ -19,7 +37,7 @@ The package is designed for zero-install use after publication:
 npx tps-racer@latest
 ```
 
-A normal hosted website cannot directly start local coding-agent CLIs or reuse their local subscription credentials. The `npx` package is the local companion: it binds only to loopback, launches the agents on the same machine, and serves the browser UI. A hosted landing page can document the tool, but the benchmark itself must run locally unless users install a separate daemon.
+A normal hosted website cannot directly start local coding-agent CLIs or reuse their local subscription credentials. The package is the local companion: it launches the agents on the same machine and either serves the browser UI on loopback or runs the terminal flow directly. A hosted landing page can document the tool, but the benchmark itself must run locally unless users install a separate daemon.
 
 ## Supported harnesses
 
@@ -54,6 +72,7 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm start -- --no-open
+pnpm start -- --cli
 ```
 
 The built `dist/` directory contains the publishable CLI and browser assets.

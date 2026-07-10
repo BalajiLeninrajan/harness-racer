@@ -251,6 +251,7 @@ export async function runBenchmark(
           request.mode === "parallel"
             ? await runParallel(request.competitors, workload, sample, warmup, adapters, signal, emit)
             : await runSequential(request.competitors, workload, sample, warmup, adapters, signal, emit);
+        if (signal.aborted) throw signal.reason;
         results.push(...runResults);
       } catch (error) {
         if (signal.aborted) throw error;
@@ -262,6 +263,7 @@ export async function runBenchmark(
     }
   }
 
+  if (signal.aborted) throw signal.reason;
   emit({
     type: "benchmark.complete",
     results,

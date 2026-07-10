@@ -1,7 +1,7 @@
 {
   "name": "tps-racer",
   "version": "0.1.0",
-  "description": "Race local coding-agent harness and model stacks by visible responsiveness and streaming speed.",
+  "description": "Race local coding-agent harness and model stacks by visible responsiveness and streaming speed in your browser or terminal.",
   "type": "module",
   "bin": {
     "tps-racer": "dist/cli.js"

@@ -88,4 +88,43 @@ describe("benchmark engine", () => {
       crowns: [],
     });
   });
+
+  it("does not report completion when a parallel heat is cancelled", async () => {
+    const controller = new AbortController();
+    const cancellation = new Error("cancelled by test");
+    const cancellingAdapter = (id: "codex" | "cursor"): HarnessAdapter => ({
+      id,
+      name: id,
+      command: id,
+      async probe() {
+        return { id, name: id, command: id, installed: true, authenticated: true, models: [] };
+      },
+      async run(input) {
+        input.onReady();
+        await input.waitForStart();
+        controller.abort(cancellation);
+        throw cancellation;
+      },
+    });
+    const request: BenchmarkRequest = {
+      type: "start",
+      mode: "parallel",
+      samplePreset: "quick",
+      competitors: [
+        { id: "a", harness: "codex", model: "alpha", label: "Alpha", color: "#fff" },
+        { id: "b", harness: "cursor", model: "beta", label: "Beta", color: "#000" },
+      ],
+    };
+    const events: ServerEvent[] = [];
+
+    await expect(
+      runBenchmark(
+        request,
+        [cancellingAdapter("codex"), cancellingAdapter("cursor")],
+        controller.signal,
+        (event) => events.push(event),
+      ),
+    ).rejects.toBe(cancellation);
+    expect(events.some((event) => event.type === "benchmark.complete")).toBe(false);
+  });
 });

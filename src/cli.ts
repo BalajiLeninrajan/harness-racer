@@ -11,7 +11,31 @@ const shouldOpen = !args.has("--no-open");
 const portArg = process.argv.findIndex((arg) => arg === "--port");
 const requestedPort = portArg >= 0 ? Number(process.argv[portArg + 1]) : 4317;
 
+const help = `TPS Racer
+
+Usage: tps-racer [options]
+
+Options:
+  --cli          Run the benchmark entirely in the terminal
+  --no-open      Start the browser app without opening it automatically
+  --port <port>  Set the browser app's loopback port (default: 4317)
+  -h, --help     Show this help
+`;
+
 async function main(): Promise<void> {
+  if (args.has("--help") || args.has("-h")) {
+    console.log(help);
+    return;
+  }
+
+  if (args.has("--cli")) {
+    const { runTerminalMode } = await import("./terminal.js");
+    const result = await runTerminalMode();
+    if (result === "unavailable") process.exitCode = 1;
+    if (result === "cancelled") process.exitCode = 130;
+    return;
+  }
+
   let viteMiddleware: ((req: Parameters<typeof handleApi>[0], res: Parameters<typeof handleApi>[1]) => void) | undefined;
   let closeVite: (() => Promise<void>) | undefined;
 
