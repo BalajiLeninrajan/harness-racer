@@ -501,7 +501,14 @@ export function App() {
                   {competitors.map((competitor) => (
                     <article className="competitor-card" key={competitor.id} style={{ "--lane-color": competitor.color } as React.CSSProperties}>
                       <RacerPicker providers={runnableProviders} harness={competitor.harness} model={competitor.model} onChange={(choice) => updateSelection(competitor.id, choice)} />
-                      <button className="icon-button remove-button" onClick={() => removeCompetitor(competitor.id)} disabled={competitors.length <= 2} aria-label={`Remove ${competitor.label}`}><Minus size={17} /></button>
+                      <button
+                        className={`icon-button remove-button${competitors.length <= 2 ? " is-hidden" : ""}`}
+                        onClick={() => removeCompetitor(competitor.id)}
+                        disabled={competitors.length <= 2}
+                        aria-hidden={competitors.length <= 2 ? true : undefined}
+                        tabIndex={competitors.length <= 2 ? -1 : undefined}
+                        aria-label={`Remove ${competitor.label}`}
+                      ><Minus size={17} /></button>
                     </article>
                   ))}
                   {competitors.length < 6 && <button className="add-competitor" onClick={addCompetitor}><Plus size={17} /> Add model</button>}

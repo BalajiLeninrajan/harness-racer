@@ -246,7 +246,7 @@ h1 em { color: var(--mauve); font-style: normal; }
 .heat-switcher i { width: 24px; height: 1px; background: var(--surface-1); }
 .cancel-button { min-height: 38px; padding: 0 12px; display: flex; align-items: center; gap: 7px; color: var(--subtext-0); border: 1px solid var(--surface-1); border-radius: 9px; background: var(--base); font-size: 11px; cursor: pointer; }
 .cancel-button:hover { color: var(--red); border-color: var(--red); }
-.overall-progress { margin-bottom: 14px; padding: 12px 14px; position: sticky; top: 78px; z-index: 20; border: 1px solid var(--surface-0); border-radius: 11px; background: color-mix(in srgb, var(--base) 92%, transparent); backdrop-filter: blur(14px); }
+.overall-progress { margin-bottom: 14px; padding: 12px 14px; position: static; border: 1px solid var(--surface-0); border-radius: 11px; background: var(--base); }
 .overall-progress > div:first-child { margin-bottom: 8px; display: flex; justify-content: space-between; color: var(--subtext-0); font: 650 11px var(--mono); }
 .progress-track { height: 7px; overflow: hidden; border-radius: 999px; background: var(--crust); }
 .progress-track span { height: 100%; display: block; border-radius: inherit; background: linear-gradient(90deg, var(--mauve), var(--pink), var(--peach)); transition: width .35s; }
@@ -599,8 +599,8 @@ th {
 .launch-button > span { box-shadow: 3px 3px 7px var(--neu-dark), inset 1px 1px rgb(255 255 255 / .16); }
 .overall-progress {
   border-color: color-mix(in srgb, var(--surface-2) 38%, transparent);
-  background: color-mix(in srgb, var(--base) 93%, transparent);
-  box-shadow: var(--neu-raised-soft);
+  background: var(--base);
+  box-shadow: none;
 }
 .progress-track span,
 .lane-progress span { box-shadow: none; }
@@ -636,7 +636,7 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
   box-shadow: none;
 }
 .setup-view { width: min(1040px, 100%); padding-top: clamp(28px, 4vw, 46px); }
-.hero { display: block; max-width: 640px; margin-bottom: 22px; }
+.hero { width: min(640px, 100%); display: block; margin: 0 auto 22px; }
 .hero .eyebrow, .hero h1, .hero > p { display: flex; }
 .hero .eyebrow { margin-bottom: 10px; }
 .hero h1 { margin-top: 0; font-size: clamp(34px, 4.4vw, 50px); line-height: 1; letter-spacing: -.05em; }
@@ -646,6 +646,8 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
 .race-stripe i { height: 2px; flex: 1; border-radius: 99px; background: linear-gradient(90deg, var(--mauve), color-mix(in srgb, var(--mauve) 22%, var(--surface-1)), transparent); }
 
 .setup-panel.panel {
+  width: min(640px, 100%);
+  margin-inline: auto;
   border: 0;
   border-top: 1px solid color-mix(in srgb, var(--surface-2) 42%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--surface-2) 42%, transparent);
@@ -653,11 +655,11 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
   background: transparent;
   box-shadow: none;
 }
-.setup-panel .panel-heading { width: min(640px, 100%); min-height: 52px; margin-inline: auto; padding: 8px 0; }
+.setup-panel .panel-heading { width: 100%; min-height: 52px; margin-inline: auto; padding: 8px 0; }
 .setup-panel .step { width: 25px; height: 25px; border-radius: 7px; box-shadow: none; }
 .setup-panel .panel-heading h2 { font-size: 15px; }
 .competitor-list {
-  width: min(640px, 100%);
+  width: 100%;
   margin-inline: auto;
   grid-template-columns: 1fr;
   gap: 0;
@@ -679,11 +681,33 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  transition: grid-template-columns .22s ease, gap .22s ease;
 }
+.competitor-card:has(.remove-button.is-hidden) { grid-template-columns: minmax(0, 1fr) 0; gap: 0; }
 .competitor-card:last-of-type { border-bottom: 0; }
 .competitor-list:has(.add-competitor) .competitor-card:last-of-type { border-bottom: 1px solid color-mix(in srgb, var(--surface-1) 58%, transparent); }
 .competitor-card::before { inset: 10px auto 10px -1px; width: 3px; border-radius: 0 4px 4px 0; box-shadow: none; }
-.remove-button { grid-column: 2; grid-row: 1; align-self: center; }
+.remove-button {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  justify-self: end;
+  overflow: hidden;
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0) scale(1);
+  transition: width .22s ease, opacity .16s ease, transform .22s ease, visibility 0s;
+}
+.remove-button.is-hidden {
+  width: 0;
+  padding-inline: 0;
+  border: 0;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(8px) scale(.72);
+  pointer-events: none;
+  transition: width .22s ease, opacity .14s ease, transform .22s ease, visibility 0s linear .22s;
+}
 .add-competitor {
   width: 100%;
   justify-self: stretch;
@@ -761,7 +785,7 @@ tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); b
 .preset-grid button > span:nth-child(2) { gap: 5px; }
 .preset-grid small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panel-footer { min-height: 72px; justify-content: flex-end; padding: 13px 0; border-top: 0; }
-.setup-panel .panel-footer { width: min(640px, 100%); margin-inline: auto; }
+.setup-panel .panel-footer { width: 100%; margin-inline: auto; justify-content: flex-start; }
 .panel-footer .primary-button { min-width: 205px; }
 
 .review-grid.panel { grid-template-columns: 1fr; padding: 0; border: 0; border-top: 1px solid var(--surface-0); border-bottom: 1px solid var(--surface-0); border-radius: 0; background: transparent; box-shadow: none; }
@@ -845,7 +869,6 @@ footer { min-height: 82px; border-top-color: color-mix(in srgb, var(--surface-1)
   .launch-button { grid-column: 1; }
   .race-header { align-items: flex-start; flex-direction: column; }
   .race-header-right { width: 100%; justify-content: space-between; }
-  .overall-progress { top: 69px; }
   .results-hero { align-items: flex-start; }
   .checker-strip { width: 90px; height: 40px; }
   .winner-card { min-height: 0; grid-template-columns: 1fr; }
