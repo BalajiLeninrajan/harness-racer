@@ -334,7 +334,7 @@ export function App() {
             status: "complete",
             harnessPrepMs: event.result.metrics.harnessPrepMs,
             firstOutputMs: event.result.metrics.promptToFirstOutputMs,
-            liveVisibleTokensPerSecond: event.result.metrics.visibleTokensPerSecond,
+            liveVisibleTokensPerSecond: event.result.valid ? event.result.metrics.visibleTokensPerSecond : undefined,
             completedRuns: previous.completedRuns + 1,
             error: event.result.valid ? undefined : event.result.validationMessage,
           },
@@ -359,7 +359,7 @@ export function App() {
 
     if (event.type === "benchmark.complete") {
       setResults(event.results);
-      setSummary([...event.summary].sort((a, b) => a.finishRank - b.finishRank));
+      setSummary([...event.summary].sort((a, b) => Number(a.disqualified) - Number(b.disqualified) || a.finishRank - b.finishRank));
       setCompletedRuns(event.results.length);
       setPhase("results");
       setNotice(undefined);
@@ -386,8 +386,9 @@ export function App() {
   const expectedPerLane = totalRuns ? Math.ceil(totalRuns / Math.max(competitors.length, 1)) : 1;
   const activeWorkload = Object.values(lanes).find((lane) => lane.status === "running" || lane.status === "starting")?.workload;
   const invalidResults = results.filter((result) => !result.valid && !result.warmup);
-  const winner = summary[0];
-  const winningMargin = winner && summary[1] ? Math.max(0, summary[1].promptToFinishMs - winner.promptToFinishMs) : undefined;
+  const eligibleSummary = summary.filter((row) => !row.disqualified);
+  const winner = eligibleSummary[0];
+  const winningMargin = winner && eligibleSummary[1] ? Math.max(0, eligibleSummary[1].promptToFinishMs - winner.promptToFinishMs) : undefined;
 
   function updateCompetitor(id: string, patch: Partial<Competitor>) {
     setCompetitors((current) => current.map((competitor) => (competitor.id === id ? { ...competitor, ...patch } : competitor)));
@@ -697,74 +698,75 @@ export function App() {
             </div>
 
             {winner ? (
-              <>
-                <div className="finish-deck">
-                  <article className="winner-card" style={{ "--lane-color": winner.competitor.color } as React.CSSProperties}>
-                    <div className="winner-kicker"><Trophy size={16} /> Fastest prompt-to-finish</div>
-                    <div className="winner-identity">
-                      <HarnessMark harness={winner.competitor.harness} />
-                      <div><h2>{winner.competitor.label}</h2><span>{winner.competitor.model}</span></div>
-                    </div>
-                    <div className="winner-time"><strong>{formatMs(winner.promptToFinishMs)}</strong><span>median prompt → finish</span></div>
-                    <div className="winner-metrics">
-                      <span><small>PROMPT → FIRST</small><b>{formatMs(winner.promptToFirstOutputMs)}</b></span>
-                      <span><small>VISIBLE TOK/S</small><b>{formatVisibleRate(winner.visibleTokensPerSecond)}</b></span>
-                      <span><small>MARGIN</small><b>{winningMargin === undefined ? "solo" : `−${formatMs(winningMargin)}`}</b></span>
-                    </div>
-                  </article>
-                  <div className="runner-stack">
-                    {summary.slice(1, 3).map((row) => (
-                      <article className="runner-card" key={row.competitor.id} style={{ "--lane-color": row.competitor.color } as React.CSSProperties}>
-                        <span className="runner-place">{ordinal(row.finishRank)}</span>
-                        <HarnessMark harness={row.competitor.harness} />
-                        <div><strong>{row.competitor.label}</strong><small>{row.competitor.model}</small></div>
-                        <b>{formatMs(row.promptToFinishMs)}</b>
-                      </article>
-                    ))}
+              <div className="finish-deck">
+                <article className="winner-card" style={{ "--lane-color": winner.competitor.color } as React.CSSProperties}>
+                  <div className="winner-kicker"><Trophy size={16} /> Fastest prompt-to-finish</div>
+                  <div className="winner-identity">
+                    <HarnessMark harness={winner.competitor.harness} />
+                    <div><h2>{winner.competitor.label}</h2><span>{winner.competitor.model}</span></div>
                   </div>
-                </div>
-
-                <div className="results-table panel">
-                  <div className="table-title"><div><Flag size={18} /><h2>Full classification</h2></div><span>{results.filter((result) => result.valid && !result.warmup).length} valid runs</span></div>
-                  <div className="table-scroll">
-                    <table>
-                      <caption>Harness and model stacks ranked by median prompt-to-finish time</caption>
-                      <thead><tr><th scope="col">Place</th><th scope="col">Harness + model</th><th scope="col">Prompt → first</th><th scope="col">Cold start → first</th><th scope="col">Visible tok/s</th><th scope="col">Prompt → finish</th><th scope="col">Runs</th></tr></thead>
-                      <tbody>
-                        {summary.map((row) => (
-                          <tr key={row.competitor.id}>
-                            <td><span className={`position-badge position-${row.finishRank}`}>{row.finishRank}</span></td>
-                            <td><div className="table-racer"><span className="table-lane-swatch" style={{ background: row.competitor.color }} /><HarnessMark harness={row.competitor.harness} /><div><strong>{row.competitor.label}</strong><small>{row.competitor.model}</small></div></div></td>
-                            <td className={row.crowns.includes("firstOutput") ? "crowned" : ""}>{formatMs(row.promptToFirstOutputMs)}{row.crowns.includes("firstOutput") && <span className="best-chip">best</span>}</td>
-                            <td className={row.crowns.includes("coldStart") ? "crowned" : ""}>{formatMs(row.coldStartToFirstOutputMs)}{row.crowns.includes("coldStart") && <span className="best-chip">best</span>}</td>
-                            <td className={row.crowns.includes("visibleSpeed") ? "crowned" : ""}>{formatVisibleRate(row.visibleTokensPerSecond)}{row.crowns.includes("visibleSpeed") && <span className="best-chip">best</span>}</td>
-                            <td className={row.crowns.includes("finish") ? "crowned" : ""}>{formatMs(row.promptToFinishMs)}{row.crowns.includes("finish") && <span className="best-chip">best</span>}</td>
-                            <td><span className="run-count">{row.validRuns}</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="winner-time"><strong>{formatMs(winner.promptToFinishMs)}</strong><span>median prompt → finish</span></div>
+                  <div className="winner-metrics">
+                    <span><small>PROMPT → FIRST</small><b>{formatMs(winner.promptToFirstOutputMs)}</b></span>
+                    <span><small>VISIBLE TOK/S</small><b>{formatVisibleRate(winner.visibleTokensPerSecond)}</b></span>
+                    <span><small>MARGIN</small><b>{winningMargin === undefined ? "solo" : `−${formatMs(winningMargin)}`}</b></span>
                   </div>
+                </article>
+                <div className="runner-stack">
+                  {eligibleSummary.slice(1, 3).map((row) => (
+                    <article className="runner-card" key={row.competitor.id} style={{ "--lane-color": row.competitor.color } as React.CSSProperties}>
+                      <span className="runner-place">{ordinal(row.finishRank)}</span>
+                      <HarnessMark harness={row.competitor.harness} />
+                      <div><strong>{row.competitor.label}</strong><small>{row.competitor.model}</small></div>
+                      <b>{formatMs(row.promptToFinishMs)}</b>
+                    </article>
+                  ))}
                 </div>
-                {invalidResults.length > 0 && (
-                  <details className="invalid-results panel">
-                    <summary><span><AlertCircle size={15} /> {invalidResults.length} invalid {invalidResults.length === 1 ? "run" : "runs"} excluded</span><ChevronRight size={15} /></summary>
-                    <div>
-                      {invalidResults.map((result, index) => {
-                        const competitor = competitors.find((item) => item.id === result.competitorId);
-                        return (
-                          <p key={`${result.competitorId}-${result.workload}-${result.sample}-${index}`}>
-                            <strong>{competitor?.label ?? "Unknown racer"} · {result.workload} · sample {result.sample}</strong>
-                            <span>{result.validationMessage ?? "The output was not valid for ranking."}</span>
-                          </p>
-                        );
-                      })}
-                    </div>
-                  </details>
-                )}
-              </>
+              </div>
             ) : (
-              <div className="empty-state panel"><AlertCircle /><strong>No valid finishers</strong><span>Review the run errors and try again.</span></div>
+              <div className="empty-state panel"><AlertCircle /><strong>No eligible finishers</strong><span>Recorded results are shown below as disqualified.</span></div>
+            )}
+
+            {summary.length > 0 && (
+              <div className="results-table panel">
+                <div className="table-title"><div><Flag size={18} /><h2>Full classification</h2></div><span>{results.filter((result) => result.valid && !result.warmup).length} valid runs{summary.some((row) => row.disqualified) ? ` · ${summary.filter((row) => row.disqualified).length} DSQ` : ""}</span></div>
+                <div className="table-scroll">
+                  <table>
+                    <caption>Harness and model stacks with disqualified racers listed after ranked finishers</caption>
+                    <thead><tr><th scope="col">Place</th><th scope="col">Harness + model</th><th scope="col">Prompt → first</th><th scope="col">Cold start → first</th><th scope="col">Visible tok/s</th><th scope="col">Prompt → finish</th><th scope="col">Runs</th></tr></thead>
+                    <tbody>
+                      {summary.map((row) => (
+                        <tr className={row.disqualified ? "disqualified" : row.anomalousRuns > 0 ? "has-anomalies" : undefined} key={row.competitor.id}>
+                          <td><span className={`position-badge ${row.disqualified ? "position-dsq" : `position-${row.finishRank}`}`}>{row.disqualified ? "DSQ" : row.finishRank}</span></td>
+                          <td><div className="table-racer"><span className="table-lane-swatch" style={{ background: row.competitor.color }} /><HarnessMark harness={row.competitor.harness} /><div><strong>{row.competitor.label}</strong><small>{row.competitor.model}</small>{row.anomalousRuns > 0 && <span className="anomaly-chip">{row.disqualified ? "all runs anomalous" : `${row.anomalousRuns} anomalous ${row.anomalousRuns === 1 ? "run" : "runs"}`}</span>}</div></div></td>
+                          <td className={row.crowns.includes("firstOutput") ? "crowned" : ""}>{formatMs(row.promptToFirstOutputMs)}{row.crowns.includes("firstOutput") && <span className="best-chip">best</span>}</td>
+                          <td className={row.crowns.includes("coldStart") ? "crowned" : ""}>{formatMs(row.coldStartToFirstOutputMs)}{row.crowns.includes("coldStart") && <span className="best-chip">best</span>}</td>
+                          <td className={row.crowns.includes("visibleSpeed") ? "crowned" : ""}>{formatVisibleRate(row.visibleTokensPerSecond)}{row.crowns.includes("visibleSpeed") && <span className="best-chip">best</span>}</td>
+                          <td className={row.crowns.includes("finish") ? "crowned" : ""}>{formatMs(row.promptToFinishMs)}{row.crowns.includes("finish") && <span className="best-chip">best</span>}</td>
+                          <td><span className="run-count">{row.anomalousRuns > 0 ? `${row.validRuns}/${row.measuredRuns}` : row.measuredRuns}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {invalidResults.length > 0 && (
+              <details className="invalid-results panel">
+                <summary><span><AlertCircle size={15} /> {invalidResults.length} {invalidResults.length === 1 ? "run anomaly" : "run anomalies"}</span><ChevronRight size={15} /></summary>
+                <div>
+                  {invalidResults.map((result, index) => {
+                    const competitor = competitors.find((item) => item.id === result.competitorId);
+                    return (
+                      <p key={`${result.competitorId}-${result.workload}-${result.sample}-${index}`}>
+                        <strong>{competitor?.label ?? "Unknown racer"} · {result.workload} · sample {result.sample}</strong>
+                        <span>{result.validationMessage ?? "The output was not valid for ranking."}</span>
+                      </p>
+                    );
+                  })}
+                </div>
+              </details>
             )}
 
             <div className="results-actions">
