@@ -1,7 +1,7 @@
 {
   "name": "tps-racer",
   "version": "0.1.0",
-  "description": "Race local coding-agent models and compare TTFT and streaming TPS in your browser.",
+  "description": "Race local coding-agent harness and model stacks by visible responsiveness and streaming speed.",
   "type": "module",
   "bin": {
     "tps-racer": "dist/cli.js"

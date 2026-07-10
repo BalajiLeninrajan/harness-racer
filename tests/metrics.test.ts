@@ -16,14 +16,14 @@ function result(competitorId: string, totalMs: number, tps: number, warmup = fal
     output: "ok",
     valid: true,
     metrics: {
-      setupMs: 100,
-      modelTtftMs: totalMs / 4,
-      coldTtftMs: 100 + totalMs / 4,
-      streamMs: totalMs / 2,
-      totalMs,
-      normalizedTokens: 100,
-      normalizedTps: tps,
-      deltaCount: 4,
+      harnessPrepMs: 100,
+      promptToFirstOutputMs: totalMs / 4,
+      coldStartToFirstOutputMs: 100 + totalMs / 4,
+      visibleStreamMs: totalMs / 2,
+      promptToFinishMs: totalMs,
+      visibleTokens: 100,
+      visibleTokensPerSecond: tps,
+      streamChunkCount: 4,
     },
   };
 }
@@ -45,8 +45,8 @@ describe("metrics", () => {
       result("b", 750, 90),
     ]);
     expect(summary[0].competitor.id).toBe("a");
-    expect(summary[0].totalMs).toBe(500);
-    expect(summary[0].crowns).toContain("overall");
-    expect(summary[1].crowns).toContain("tps");
+    expect(summary[0].promptToFinishMs).toBe(500);
+    expect(summary[0].crowns).toContain("finish");
+    expect(summary[1].crowns).toContain("visibleSpeed");
   });
 });

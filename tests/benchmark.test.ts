@@ -54,6 +54,6 @@ describe("benchmark engine", () => {
     expect(completed.results.every((result) => result.valid)).toBe(true);
     expect(completed.summary).toHaveLength(2);
     expect(completed.summary[0].competitor.id).toBe("a");
-    expect(completed.summary[0].crowns).toContain("overall");
+    expect(completed.summary[0].crowns).toContain("finish");
   });
 });

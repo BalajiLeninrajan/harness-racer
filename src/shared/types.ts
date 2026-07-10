@@ -44,15 +44,15 @@ export interface CancelRequest {
 export type ClientMessage = BenchmarkRequest | CancelRequest;
 
 export interface RunMetrics {
-  setupMs: number;
-  modelTtftMs: number;
-  coldTtftMs: number;
-  streamMs: number;
-  totalMs: number;
-  normalizedTokens: number;
-  normalizedTps: number;
+  harnessPrepMs: number;
+  promptToFirstOutputMs: number;
+  coldStartToFirstOutputMs: number;
+  visibleStreamMs: number;
+  promptToFinishMs: number;
+  visibleTokens: number;
+  visibleTokensPerSecond: number;
   nativeOutputTokens?: number;
-  deltaCount: number;
+  streamChunkCount: number;
 }
 
 export interface RunResult {
@@ -69,12 +69,12 @@ export interface RunResult {
 export interface SummaryRow {
   competitor: Competitor;
   validRuns: number;
-  modelTtftMs: number;
-  coldTtftMs: number;
-  totalMs: number;
-  normalizedTps: number;
-  overallRank: number;
-  crowns: Array<"overall" | "modelTtft" | "coldTtft" | "tps">;
+  promptToFirstOutputMs: number;
+  coldStartToFirstOutputMs: number;
+  promptToFinishMs: number;
+  visibleTokensPerSecond: number;
+  finishRank: number;
+  crowns: Array<"finish" | "firstOutput" | "coldStart" | "visibleSpeed">;
 }
 
 export type ServerEvent =
@@ -96,7 +96,7 @@ export type ServerEvent =
       sample: number;
       text: string;
       elapsedMs: number;
-      liveTps?: number;
+      liveVisibleTokensPerSecond?: number;
     }
   | { type: "run.complete"; result: RunResult }
   | { type: "run.error"; competitorId: string; workload: WorkloadId; sample: number; message: string }
