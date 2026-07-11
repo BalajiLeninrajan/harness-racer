@@ -24,6 +24,20 @@ function fakeAdapter(id: "codex" | "cursor", delayMs: number): HarnessAdapter {
   };
 }
 
+function failingAdapter(id: "codex" | "cursor", message: string): HarnessAdapter {
+  return {
+    id,
+    name: id,
+    command: id,
+    async probe() {
+      return { id, name: id, command: id, installed: true, authenticated: true, models: [] };
+    },
+    async run() {
+      throw new Error(message);
+    },
+  };
+}
+
 describe("benchmark engine", () => {
   it("runs both heats behind a parallel ready barrier and produces a ranking", async () => {
     const request: BenchmarkRequest = {
@@ -87,5 +101,63 @@ describe("benchmark engine", () => {
       finishRank: 0,
       crowns: [],
     });
+  });
+
+  it("releases the parallel start barrier when a racer fails during setup", async () => {
+    const request: BenchmarkRequest = {
+      type: "start",
+      mode: "parallel",
+      samplePreset: "quick",
+      competitors: [
+        { id: "broken", harness: "codex", model: "alpha", label: "Broken", color: "#fff" },
+        { id: "healthy", harness: "cursor", model: "beta", label: "Healthy", color: "#000" },
+      ],
+    };
+    const events: ServerEvent[] = [];
+
+    await runBenchmark(
+      request,
+      [failingAdapter("codex", "setup failed"), fakeAdapter("cursor", 60)],
+      new AbortController().signal,
+      (event) => events.push(event),
+    );
+
+    const errors = events.filter((event) => event.type === "run.error");
+    expect(errors).toHaveLength(2);
+    expect(errors.every((event) => event.competitorId === "broken" && event.message === "setup failed")).toBe(true);
+
+    const completed = events.find((event) => event.type === "benchmark.complete");
+    expect(completed?.type).toBe("benchmark.complete");
+    if (completed?.type !== "benchmark.complete") return;
+    expect(completed.results).toHaveLength(2);
+    expect(completed.results.every((result) => result.competitorId === "healthy" && result.valid)).toBe(true);
+    expect(completed.summary.map((row) => row.competitor.id)).toEqual(["healthy"]);
+  });
+
+  it("continues sequential heats after one racer fails", async () => {
+    const request: BenchmarkRequest = {
+      type: "start",
+      mode: "sequential",
+      samplePreset: "quick",
+      competitors: [
+        { id: "broken", harness: "codex", model: "alpha", label: "Broken", color: "#fff" },
+        { id: "healthy", harness: "cursor", model: "beta", label: "Healthy", color: "#000" },
+      ],
+    };
+    const events: ServerEvent[] = [];
+
+    await runBenchmark(
+      request,
+      [failingAdapter("codex", "launch failed"), fakeAdapter("cursor", 60)],
+      new AbortController().signal,
+      (event) => events.push(event),
+    );
+
+    expect(events.filter((event) => event.type === "run.error")).toHaveLength(2);
+    const completed = events.find((event) => event.type === "benchmark.complete");
+    expect(completed?.type).toBe("benchmark.complete");
+    if (completed?.type !== "benchmark.complete") return;
+    expect(completed.results).toHaveLength(2);
+    expect(completed.results.every((result) => result.competitorId === "healthy" && result.valid)).toBe(true);
   });
 });
