@@ -718,7 +718,7 @@ export function App() {
 
       <footer>
         <div className="footer-brand"><Gauge size={16} /><strong><b>tps</b>.racer</strong><span>Model speed benchmark</span></div>
-        <div className="footer-metrics"><span>TTFT</span><i /><span>TPS</span><i /><span>Total time</span></div>
+        <span className="footer-note">Made with 💜 in Waterloo</span>
       </footer>
     </div>
   );
