@@ -56,9 +56,9 @@ interface LaneState {
 
 const COLORS = ["#cba6f7", "#94e2d5", "#f9e2af", "#89b4fa", "#fab387", "#f5c2e7"];
 const PRESETS: Array<{ id: SamplePreset; label: string; runs: string }> = [
-  { id: "quick", label: "Quick", runs: "2 runs" },
-  { id: "standard", label: "Standard", runs: "2 warmups · 6 runs" },
-  { id: "thorough", label: "Thorough", runs: "2 warmups · 10 runs" },
+  { id: "quick", label: "Quick", runs: "2 measured · no warmup" },
+  { id: "standard", label: "Standard", runs: "6 measured · 2 warmups" },
+  { id: "thorough", label: "Thorough", runs: "10 measured · 2 warmups" },
 ];
 
 const HARNESS_LABELS: Record<HarnessId, string> = {
@@ -535,8 +535,8 @@ export function App() {
                 <div className="option-group">
                   <label className="option-label">Run order</label>
                   <div className="segmented">
-                    <button aria-pressed={mode === "parallel"} className={mode === "parallel" ? "active" : ""} onClick={() => setMode("parallel")}><Activity size={16} /><span><b>Parallel</b><small>Run together</small></span></button>
-                    <button aria-pressed={mode === "sequential"} className={mode === "sequential" ? "active" : ""} onClick={() => setMode("sequential")}><ChevronRight size={16} /><span><b>Sequential</b><small>One at a time</small></span></button>
+                    <button aria-pressed={mode === "parallel"} className={mode === "parallel" ? "active" : ""} onClick={() => setMode("parallel")}><Activity size={16} /><span><b>Parallel</b><small>Start together; may compete for resources</small></span></button>
+                    <button aria-pressed={mode === "sequential"} className={mode === "sequential" ? "active" : ""} onClick={() => setMode("sequential")}><ChevronRight size={16} /><span><b>Sequential</b><small>One at a time; reduces contention</small></span></button>
                   </div>
                 </div>
                 <div className="option-group">

@@ -1,164 +1,107 @@
-import {
-  ArrowLeft,
-  Check,
-  Clock3,
-  Gauge,
-  Layers3,
-  ShieldCheck,
-  Target,
-  TimerReset,
-  Zap,
-} from "lucide-react";
+import { ArrowLeft, Clock3 } from "lucide-react";
 
 interface AboutProps {
   onBack: () => void;
 }
 
-const stackParts = ["Harness", "Model", "Provider route", "Network", "Your machine"];
-
 const metrics = [
-  {
-    label: "Harness prep",
-    short: "PREP",
-    description: "Time the adapter spends launching and preparing its harness before it declares the lane ready.",
-  },
-  {
-    label: "Prompt → first output",
-    short: "FIRST",
-    description: "From the common start signal until the first visible streamed text reaches TPS Racer.",
-  },
-  {
-    label: "Cold start → first output",
-    short: "COLD",
-    description: "Harness prep plus prompt-to-first-output. Time spent waiting at the parallel start barrier is excluded.",
-  },
-  {
-    label: "Visible tokens / sec",
-    short: "TOK/S",
-    description: "Visible output counted with one shared tokenizer, divided by the first-to-last stream window.",
-  },
-  {
-    label: "Prompt → finish",
-    short: "FINISH",
-    description: "From the common start signal until the final visible output chunk. This metric decides the finishing order.",
-  },
-];
+  ["Harness prep", "Time spent launching and preparing the harness before the lane is ready."],
+  ["Prompt → first output", "Time from the start signal until the first visible text reaches TPS Racer."],
+  ["Cold start → first output", "Harness prep plus prompt-to-first-output, excluding any wait at the parallel start barrier."],
+  ["Visible tokens / sec", "Visible output counted with the same tokenizer for every racer, divided by the visible streaming window."],
+  ["Prompt → finish", "Time from the start signal to the final visible chunk. This determines finishing order."],
+] as const;
 
 export function About({ onBack }: AboutProps) {
   return (
     <section className="about-view page-enter">
       <button className="back-button" onClick={onBack}><ArrowLeft size={16} /> Back to the starting grid</button>
 
-      <div className="about-hero">
-        <div>
-          <div className="eyebrow"><Layers3 size={14} /> WHAT THIS RACE MEASURES</div>
-          <h1>The stack you use.<br /><em>Not a model in a vacuum.</em></h1>
-          <p>
-            TPS Racer measures the local coding-agent experience end to end. Harness startup,
-            model behavior, provider routing, streaming protocol, network conditions, and your
-            machine all shape the result—and that dependence is intentional.
-          </p>
-        </div>
-        <div className="about-thesis panel">
-          <Gauge size={26} />
-          <strong>A practical speed test</strong>
-          <p>“Which harness + model combination feels fastest for me, right now?”</p>
-        </div>
-      </div>
-
-      <div className="stack-equation" aria-label="Components included in every benchmark result">
-        {stackParts.map((part, index) => (
-          <div key={part}>
-            <span>{String(index + 1).padStart(2, "0")}</span>
-            <strong>{part}</strong>
-            {index < stackParts.length - 1 && <i aria-hidden="true">+</i>}
-          </div>
-        ))}
-        <b aria-hidden="true">=</b>
-        <div className="stack-result"><Zap size={18} /><strong>Measured experience</strong></div>
-      </div>
+      <header className="about-summary">
+        <h1>Methodology</h1>
+        <p>
+          TPS Racer measures the speed of the local harness and model combination you run. Results can also
+          reflect provider routing, network conditions, account configuration, and your machine. This is not
+          a model-quality test or a raw model API benchmark.
+        </p>
+      </header>
 
       <section className="method-section">
         <div className="method-heading">
           <span>01</span>
-          <div><h2>How every heat works</h2><p>Controls keep the race comparable without pretending the harnesses are identical.</p></div>
+          <div><h2>Test text</h2></div>
         </div>
-        <div className="method-grid">
-          <article className="panel">
-            <Target size={20} />
-            <h3>Same target</h3>
-            <p>Every lane receives the same fixed research-paper prose and Python reproduction prompts. Output length and content are controlled.</p>
-          </article>
-          <article className="panel">
-            <ShieldCheck size={20} />
-            <h3>Isolated run</h3>
-            <p>Each attempt gets an empty temporary directory. Tools are disabled or denied, and every run has a 120-second limit.</p>
-          </article>
-          <article className="panel">
-            <TimerReset size={20} />
-            <h3>Fair starting gun</h3>
-            <p>Same-gun mode holds ready lanes behind a barrier. Time-trial mode runs each stack separately to avoid local contention.</p>
-          </article>
-          <article className="panel">
-            <Check size={20} />
-            <h3>Valid output only</h3>
-            <p>The response must match the target and arrive as a visible stream. Invalid and warmup runs never enter the ranking.</p>
-          </article>
+        <div className="limits-card panel source-copy">
+          <p>Each racer is asked to reproduce the same two fixed texts exactly:</p>
+          <ul>
+            <li>
+              Prose: the abstract of <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noreferrer">“Attention Is All You Need”</a> by
+              Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, and Illia Polosukhin.
+            </li>
+            <li>
+              Code: <a href="https://github.com/karpathy/nanoGPT/blob/master/model.py" target="_blank" rel="noreferrer"><code>CausalSelfAttention.forward</code> from nanoGPT</a>,
+              copyright Andrej Karpathy and used under the MIT License.
+            </li>
+          </ul>
+          <p>Runs use an empty temporary directory, tools are disabled or denied, and each run has a 120-second limit. Only exact reproductions count.</p>
         </div>
-      </section>
-
-      <section className="method-section">
-        <div className="method-heading">
-          <span>02</span>
-          <div><h2>What the clocks mean</h2><p>The labels describe observable stack behavior, not private model-inference phases.</p></div>
-        </div>
-        <div className="metric-definitions panel">
-          {metrics.map((metric) => (
-            <article key={metric.short}>
-              <span>{metric.short}</span>
-              <div><h3>{metric.label}</h3><p>{metric.description}</p></div>
-            </article>
-          ))}
-        </div>
-        <p className="boundary-note">
-          <Clock3 size={15} /> Harness APIs expose different lifecycle boundaries. “Harness prep” therefore means
-          adapter-declared readiness; remaining handoff work naturally appears in prompt-to-first-output. That is part of the stack comparison.
-        </p>
       </section>
 
       <section className="method-section method-split">
         <div>
           <div className="method-heading compact">
-            <span>03</span>
-            <div><h2>Sampling and ranking</h2></div>
+            <span>02</span>
+            <div><h2>Run order</h2></div>
           </div>
-          <div className="sample-table panel">
-            <div><span>QUICK</span><strong>0 warmups · 1 measured run per workload</strong></div>
-            <div><span>STANDARD</span><strong>1 warmup · 3 measured runs per workload</strong></div>
-            <div><span>THOROUGH</span><strong>1 warmup · 5 measured runs per workload</strong></div>
+          <div className="sample-table panel option-definitions">
+            <div><span>PARALLEL</span><strong>All racers prepare, then start together. This is faster, but they share local resources and network capacity.</strong></div>
+            <div><span>SEQUENTIAL</span><strong>Racers run one at a time. This takes longer but reduces contention between racers.</strong></div>
           </div>
-          <p className="method-copy">Results are medians across valid, measured paper and Python runs. Prompt-to-finish sets the ranking; values within 1% share a best mark.</p>
         </div>
         <div>
           <div className="method-heading compact">
-            <span>04</span>
-            <div><h2>What it does not claim</h2></div>
+            <span>03</span>
+            <div><h2>Samples</h2></div>
           </div>
-          <div className="limits-card panel">
-            <p>This is not a model-quality evaluation, a raw API benchmark, or a laboratory measure of inference hardware.</p>
-            <ul>
-              <li>Hidden reasoning and provider-native tokens are not used for cross-stack speed.</li>
-              <li>Account tier, user configuration, provider load, and network conditions can affect a run.</li>
-              <li>Results are a local snapshot; repeat serious comparisons at different times.</li>
-            </ul>
+          <div className="sample-table panel option-definitions">
+            <div><span>QUICK</span><strong>No warmup, then 1 measured run for each text (2 measured runs total per racer).</strong></div>
+            <div><span>STANDARD</span><strong>1 warmup and 3 measured runs for each text (2 warmups and 6 measured runs total).</strong></div>
+            <div><span>THOROUGH</span><strong>1 warmup and 5 measured runs for each text (2 warmups and 10 measured runs total).</strong></div>
           </div>
         </div>
       </section>
 
-      <div className="about-cta panel">
-        <div><span>READY?</span><h2>Race the stacks you actually use.</h2></div>
-        <button className="primary-button" onClick={onBack}>Build the starting grid <ArrowLeft className="arrow-forward" size={17} /></button>
-      </div>
+      <section className="method-section">
+        <div className="method-heading">
+          <span>04</span>
+          <div><h2>Measurements and ranking</h2></div>
+        </div>
+        <div className="metric-definitions panel">
+          {metrics.map(([label, description]) => (
+            <article key={label}>
+              <div><h3>{label}</h3><p>{description}</p></div>
+            </article>
+          ))}
+        </div>
+        <p className="boundary-note">
+          <Clock3 size={15} /> Results are medians of valid measured runs across both texts. Warmups and invalid outputs are excluded.
+          Harnesses expose different readiness boundaries, so harness prep is based on when each adapter declares itself ready.
+        </p>
+      </section>
+
+      <section className="method-section">
+        <div className="method-heading">
+          <span>05</span>
+          <div><h2>Limitations</h2></div>
+        </div>
+        <div className="limits-card panel">
+          <ul>
+            <li>Hidden reasoning and provider-native token counts are not compared.</li>
+            <li>Account tier, configuration, provider load, network conditions, and the local machine can affect results.</li>
+            <li>Results are a point-in-time local measurement. Repeat important comparisons at different times.</li>
+          </ul>
+        </div>
+      </section>
     </section>
   );
 }
