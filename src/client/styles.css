@@ -33,19 +33,25 @@
   --muted: var(--subtext-0);
   --soft: var(--subtext-1);
   --orange: var(--mauve);
+  --neu-dark: rgb(17 17 27 / .58);
+  --neu-dark-soft: rgb(17 17 27 / .34);
+  --neu-light-soft: rgb(69 71 90 / .14);
+  --neu-raised: 6px 6px 14px var(--neu-dark), -3px -3px 8px var(--neu-light-soft);
+  --neu-raised-soft: 3px 3px 8px var(--neu-dark-soft), -2px -2px 5px var(--neu-light-soft);
+  --neu-inset: inset 2px 2px 5px rgb(17 17 27 / .58), inset -2px -2px 5px rgb(69 71 90 / .2);
+  --neu-inset-soft: inset 1px 1px 3px rgb(17 17 27 / .48), inset -1px -1px 3px rgb(69 71 90 / .16);
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; scrollbar-gutter: stable; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--crust); }
 button, input, select { font: inherit; }
 button { color: inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--mauve); outline-offset: 3px; }
 ::selection { color: var(--crust); background: var(--mauve); }
 
-.app-shell { min-height: 100vh; position: relative; overflow-x: clip; background: var(--mantle); }
+.app-shell { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; position: relative; overflow-x: clip; background: var(--mantle); }
 .app-shell::before { content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .42; background: linear-gradient(90deg, color-mix(in srgb, var(--mauve) 8%, transparent) 1px, transparent 1px) 0 0 / 72px 100%; mask-image: linear-gradient(90deg, transparent, #000 15% 85%, transparent); }
-.ambient { display: none; }
 
 .topbar { min-height: 68px; padding: 10px clamp(16px, 3vw, 42px); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; position: sticky; top: 0; z-index: 50; background: color-mix(in srgb, var(--crust) 92%, transparent); border-bottom: 1px solid var(--surface-0); backdrop-filter: blur(14px); }
 .brand { justify-self: start; display: flex; align-items: center; gap: 9px; padding: 0; border: 0; background: transparent; font-size: 15px; font-weight: 750; letter-spacing: -.02em; cursor: pointer; }
@@ -70,7 +76,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .about-button:disabled { opacity: .45; cursor: not-allowed; }
 .page-context { display: flex; align-items: center; gap: 7px; color: var(--mauve); font: 700 11px/1 var(--mono); letter-spacing: .04em; }
 
-main { width: min(1440px, calc(100% - 40px)); margin: 0 auto; position: relative; z-index: 1; }
+main { width: min(1440px, calc(100% - 40px)); min-width: 0; margin: 0 auto; position: relative; z-index: 1; }
 h1, h2, p { margin-top: 0; }
 h1 { text-wrap: balance; }
 h1 em { color: var(--mauve); font-style: normal; }
@@ -100,10 +106,10 @@ h1 em { color: var(--mauve); font-style: normal; }
 .panel-heading h2 { margin: 0; font-size: 18px; }
 .step { width: 28px; height: 28px; display: inline-grid; place-items: center; flex: 0 0 auto; color: var(--crust); border-radius: 8px; background: var(--mauve); font: 800 11px/1 var(--mono); }
 .count { color: var(--overlay-2); font: 600 11px/1 var(--mono); }
-.competitor-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 18px; }
-.competitor-card { min-width: 0; display: grid; grid-template-columns: 42px minmax(0, .9fr) minmax(0, 1.1fr) 34px; grid-template-rows: auto auto; gap: 12px; padding: 16px; position: relative; border: 1px solid color-mix(in srgb, var(--lane-color) 28%, var(--surface-0)); border-radius: 13px; background: linear-gradient(135deg, color-mix(in srgb, var(--lane-color) 8%, var(--mantle)), var(--mantle) 48%); }
+.competitor-list { display: grid; grid-template-columns: 1fr; gap: 12px; padding: 18px; }
+.competitor-card { min-width: 0; display: grid; grid-template-columns: 42px minmax(0, .9fr) minmax(0, 1.1fr) minmax(0, .9fr) 34px; grid-template-rows: auto; gap: 12px; padding: 16px; position: relative; border: 1px solid color-mix(in srgb, var(--lane-color) 28%, var(--surface-0)); border-radius: 13px; background: linear-gradient(135deg, color-mix(in srgb, var(--lane-color) 8%, var(--mantle)), var(--mantle) 48%); }
 .competitor-card::before { content: ""; position: absolute; inset: 12px auto 12px 0; width: 4px; border-radius: 0 6px 6px 0; background: var(--lane-color); }
-.grid-position { grid-row: 1 / 3; width: 34px; height: 34px; display: grid; place-items: center; align-self: start; color: var(--crust); border-radius: 10px; background: var(--lane-color); font: 850 14px/1 var(--mono); }
+.grid-position { grid-row: 1; width: 34px; height: 34px; display: grid; place-items: center; align-self: start; color: var(--crust); border-radius: 10px; background: var(--lane-color); font: 850 14px/1 var(--mono); }
 .field { min-width: 0; }
 .field label { display: block; margin: 0 0 7px 1px; color: var(--overlay-2); font: 650 11px/1 var(--mono); }
 .field input, .field select { width: 100%; height: 42px; padding: 0 11px; color: var(--text); border: 1px solid var(--surface-0); border-radius: 9px; background: var(--crust); font-size: 13px; transition: border-color .18s, background .18s; }
@@ -111,7 +117,7 @@ h1 em { color: var(--mauve); font-style: normal; }
 .field select { appearance: none; padding-left: 41px; padding-right: 27px; cursor: pointer; }
 .harness-field { grid-column: 2; }
 .model-field { grid-column: 3; }
-.label-field { grid-column: 2 / 4; }
+.label-field { grid-column: 4; }
 .select-wrap { position: relative; }
 .select-wrap::after { content: "⌄"; position: absolute; right: 11px; top: 9px; color: var(--overlay-1); pointer-events: none; }
 .select-wrap .harness-mark { position: absolute; z-index: 1; left: 8px; top: 8px; }
@@ -123,7 +129,7 @@ h1 em { color: var(--mauve); font-style: normal; }
 .harness-claudeAgent { color: var(--pink); }
 .harness-opencode { color: var(--green); }
 .harness-grok { color: var(--blue); }
-.remove-button { grid-column: 4; grid-row: 1; align-self: start; }
+.remove-button { grid-column: 5; grid-row: 1; align-self: start; }
 .icon-button { width: 32px; height: 32px; display: grid; place-items: center; color: var(--overlay-1); border: 1px solid transparent; border-radius: 9px; background: transparent; cursor: pointer; }
 .icon-button:hover:not(:disabled) { color: var(--red); border-color: color-mix(in srgb, var(--red) 38%, transparent); background: color-mix(in srgb, var(--red) 9%, transparent); }
 .icon-button:disabled { opacity: .28; cursor: not-allowed; }
@@ -239,7 +245,7 @@ h1 em { color: var(--mauve); font-style: normal; }
 .heat-switcher i { width: 24px; height: 1px; background: var(--surface-1); }
 .cancel-button { min-height: 38px; padding: 0 12px; display: flex; align-items: center; gap: 7px; color: var(--subtext-0); border: 1px solid var(--surface-1); border-radius: 9px; background: var(--base); font-size: 11px; cursor: pointer; }
 .cancel-button:hover { color: var(--red); border-color: var(--red); }
-.overall-progress { margin-bottom: 14px; padding: 12px 14px; position: sticky; top: 78px; z-index: 20; border: 1px solid var(--surface-0); border-radius: 11px; background: color-mix(in srgb, var(--base) 92%, transparent); backdrop-filter: blur(14px); }
+.overall-progress { margin-bottom: 14px; padding: 12px 14px; position: static; border: 1px solid var(--surface-0); border-radius: 11px; background: var(--base); }
 .overall-progress > div:first-child { margin-bottom: 8px; display: flex; justify-content: space-between; color: var(--subtext-0); font: 650 11px var(--mono); }
 .progress-track { height: 7px; overflow: hidden; border-radius: 999px; background: var(--crust); }
 .progress-track span { height: 100%; display: block; border-radius: inherit; background: linear-gradient(90deg, var(--mauve), var(--pink), var(--peach)); transition: width .35s; }
@@ -276,34 +282,29 @@ h1 em { color: var(--mauve); font-style: normal; }
 .race-warning { margin-top: 12px; border: 1px solid color-mix(in srgb, var(--peach) 25%, var(--surface-0)); border-radius: 10px; }
 
 .results-view { width: min(1120px, 100%); margin: 0 auto; padding: 50px 0 100px; }
-.results-hero { margin-bottom: 24px; display: flex; align-items: end; justify-content: space-between; gap: 30px; }
+.results-hero { margin-bottom: 24px; }
 .results-hero h1 { font-size: clamp(40px, 6vw, 66px); }
-.checker-strip { width: 180px; height: 48px; flex: 0 0 auto; opacity: .72; border-radius: 9px; background: conic-gradient(from 90deg, var(--surface-1) 25%, transparent 0 50%, var(--surface-1) 0 75%, transparent 0) 0 0 / 16px 16px; }
-.finish-deck { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(260px, .55fr); gap: 12px; margin-bottom: 18px; }
-.winner-card { min-height: 300px; padding: 24px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr auto; gap: 18px 28px; position: relative; overflow: hidden; color: var(--text); border: 1px solid color-mix(in srgb, var(--lane-color) 48%, var(--surface-0)); border-radius: 18px; background: linear-gradient(135deg, color-mix(in srgb, var(--lane-color) 18%, var(--base)), var(--base) 56%); }
-.winner-card::after { content: "01"; position: absolute; right: 18px; top: -30px; color: color-mix(in srgb, var(--lane-color) 11%, transparent); font: 900 180px/1 var(--mono); letter-spacing: -.12em; pointer-events: none; }
-.winner-kicker { grid-column: 1 / 3; display: flex; align-items: center; gap: 7px; color: var(--yellow); font: 750 11px var(--mono); }
-.winner-identity { min-width: 0; display: flex; align-items: center; gap: 13px; align-self: center; position: relative; z-index: 1; }
-.winner-identity .harness-mark { width: 46px; height: 46px; border-radius: 13px; }
-.winner-identity h2 { margin: 0 0 6px; font-size: clamp(25px, 4vw, 38px); letter-spacing: -.035em; }
-.winner-identity span { color: var(--subtext-0); font: 550 11px var(--mono); }
-.winner-time { align-self: center; display: flex; flex-direction: column; align-items: end; gap: 5px; position: relative; z-index: 1; }
-.winner-time strong { color: var(--lane-color); font: 720 clamp(42px, 7vw, 70px)/.9 var(--mono); letter-spacing: -.08em; font-variant-numeric: tabular-nums; }
-.winner-time span { color: var(--overlay-2); font: 600 10px var(--mono); }
-.winner-metrics { grid-column: 1 / 3; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.winner-metrics > span { min-height: 62px; padding: 11px 13px; display: flex; flex-direction: column; justify-content: center; gap: 6px; border: 1px solid var(--surface-0); border-radius: 10px; background: color-mix(in srgb, var(--crust) 63%, transparent); }
-.winner-metrics small { color: var(--overlay-1); font: 650 9px var(--mono); }
-.winner-metrics b { font: 650 18px var(--mono); font-variant-numeric: tabular-nums; }
-.runner-stack { display: grid; gap: 12px; }
-.runner-card { min-height: 0; padding: 15px; display: grid; grid-template-columns: 36px 28px minmax(0, 1fr); grid-template-rows: 1fr auto; align-items: center; gap: 6px 10px; position: relative; overflow: hidden; border: 1px solid color-mix(in srgb, var(--lane-color) 28%, var(--surface-0)); border-radius: 14px; background: var(--base); }
-.runner-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--lane-color); }
-.runner-place { grid-row: 1 / 3; width: 34px; height: 34px; display: grid; place-items: center; color: var(--crust); border-radius: 10px; background: var(--lane-color); font: 800 10px var(--mono); }
-.runner-card > .harness-mark { grid-row: 1; }
-.runner-card > div { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.runner-card strong, .runner-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.runner-card strong { font-size: 13px; }
-.runner-card small { color: var(--overlay-2); font: 500 9px var(--mono); }
-.runner-card > b { grid-column: 2 / 4; color: var(--lane-color); font: 680 24px var(--mono); font-variant-numeric: tabular-nums; }
+.podium-showcase { min-height: 310px; margin-bottom: 18px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--surface-1) 38%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--surface-0) 3%, var(--base)); box-shadow: 9px 11px 24px rgb(11 11 19 / .38), -3px -3px 9px rgb(69 71 90 / .09), inset 1px 1px rgb(255 255 255 / .025); }
+.podium-grid { min-height: 310px; margin: 0; padding: 24px 28px 0; display: grid; grid-template-columns: 1fr 1.08fr 1fr; grid-template-areas: "second first third"; gap: 0; align-items: stretch; list-style: none; }
+.podium-entry { min-width: 0; display: grid; grid-template-rows: 1fr var(--step-height); align-items: end; background: transparent; border: 0; box-shadow: none; }
+.podium-entry.rank-1 { grid-area: first; --step-height: 94px; }
+.podium-entry.rank-2 { grid-area: second; --step-height: 68px; }
+.podium-entry.rank-3 { grid-area: third; --step-height: 50px; }
+.podium-identity { min-width: 0; padding: 0 clamp(8px, 2vw, 18px) 16px; display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; }
+.podium-rank { color: var(--lane-color); font: 750 9px/1 var(--mono); text-transform: uppercase; letter-spacing: .06em; }
+.podium-identity .harness-mark { width: 40px; height: 40px; margin: 2px 0 3px; border-radius: 11px; }
+.podium-entry.rank-1 .harness-mark { width: 46px; height: 46px; }
+.podium-identity strong, .podium-identity small { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.podium-identity strong { color: var(--text); font-size: clamp(13px, 2vw, 17px); }
+.podium-entry.rank-1 .podium-identity strong { font-size: clamp(15px, 2.3vw, 20px); }
+.podium-identity small { color: var(--overlay-2); font: 500 9px/1 var(--mono); }
+.podium-identity b { max-width: 100%; margin-top: 4px; overflow: hidden; color: var(--lane-color); font: 700 clamp(22px, 4vw, 34px)/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.045em; text-overflow: ellipsis; white-space: nowrap; }
+.podium-entry.rank-1 .podium-identity b { font-size: clamp(28px, 5vw, 42px); }
+.podium-step { height: var(--step-height); display: grid; place-items: center; color: color-mix(in srgb, var(--lane-color) 36%, var(--overlay-0)); border-top: 2px solid color-mix(in srgb, var(--lane-color) 64%, var(--surface-1)); background: color-mix(in srgb, var(--surface-0) 16%, var(--base)); box-shadow: inset 3px 3px 8px rgb(11 11 19 / .32), inset -2px -2px 6px rgb(69 71 90 / .08); }
+.podium-entry.rank-2 .podium-step { border-radius: 13px 0 0; }
+.podium-entry.rank-1 .podium-step { border-radius: 13px 13px 0 0; }
+.podium-entry.rank-3 .podium-step { border-radius: 0 13px 0 0; }
+.podium-step span { font: 850 clamp(26px, 5vw, 46px)/1 var(--mono); }
 .results-table { overflow: hidden; margin-top: 0; }
 .table-title { min-height: 64px; padding: 13px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--surface-0); }
 .table-title > div { display: flex; align-items: center; gap: 9px; color: var(--mauve); }
@@ -402,6 +403,408 @@ footer p { margin: 0; font: 500 10px var(--mono); }
 footer button { padding: 0; color: var(--subtext-0); border: 0; border-bottom: 1px solid var(--surface-1); background: transparent; font: 600 10px var(--mono); cursor: pointer; }
 footer button:hover { color: var(--mauve); border-color: var(--mauve); }
 footer button:disabled { opacity: .45; cursor: not-allowed; }
+/* Neumorphic depth system, built entirely from Catppuccin Mocha tokens. */
+body { background: var(--base); }
+.app-shell {
+  background:
+    radial-gradient(circle at 14% 8%, rgb(203 166 247 / .008), transparent 44rem),
+    var(--base);
+}
+.app-shell::before { display: none; }
+
+.topbar {
+  background: color-mix(in srgb, var(--base) 91%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--surface-1) 45%, transparent);
+  box-shadow: 0 5px 12px var(--neu-dark-soft), inset 0 1px color-mix(in srgb, var(--surface-1) 30%, transparent);
+}
+.brand-icon,
+.step,
+.grid-position,
+.review-number,
+.lane-position,
+.position-1 {
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  box-shadow: 2px 2px 5px var(--neu-dark-soft), inset 0 1px rgb(255 255 255 / .1);
+}
+.version,
+.connection,
+.phase-track i,
+.hero-stats span,
+.starting-lights {
+  border-color: color-mix(in srgb, var(--surface-2) 42%, transparent);
+  background: var(--base);
+  box-shadow: var(--neu-raised-soft);
+}
+.phase-track span.active i { box-shadow: var(--neu-inset-soft); }
+.phase-track span.done i { box-shadow: var(--neu-inset-soft); }
+
+.hero-track,
+.panel,
+.race-lane {
+  border-color: color-mix(in srgb, var(--surface-2) 40%, transparent);
+  background: var(--base);
+  box-shadow: var(--neu-raised), inset 1px 1px color-mix(in srgb, var(--surface-2) 30%, transparent);
+}
+.hero-track { box-shadow: 7px 7px 16px var(--neu-dark), -4px -4px 9px var(--neu-light-soft); }
+.hero-track > span::before {
+  background: var(--base);
+  box-shadow: var(--neu-inset-soft);
+}
+.hero-track i {
+  border-color: var(--base);
+  box-shadow: 0 0 0 2px var(--track-color), 2px 2px 5px var(--neu-dark-soft);
+}
+.panel-heading,
+.panel-footer,
+.table-title,
+.lane-head { border-color: color-mix(in srgb, var(--surface-2) 34%, transparent); }
+
+.competitor-card,
+.review-racer {
+  border-color: color-mix(in srgb, var(--lane-color) 22%, var(--surface-1));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--lane-color) 7%, var(--base)), var(--base) 58%);
+  box-shadow: var(--neu-raised-soft), inset 1px 1px color-mix(in srgb, var(--lane-color) 12%, var(--surface-2));
+}
+.competitor-card::before,
+.review-racer::before { box-shadow: none; }
+.harness-mark {
+  border-color: color-mix(in srgb, currentColor 32%, var(--surface-1));
+  background: var(--base);
+  box-shadow: 2px 2px 5px var(--neu-dark-soft);
+}
+
+.field input,
+.field select,
+.model-picker-trigger,
+.model-search,
+.stream-window,
+.progress-track,
+.lane-progress,
+.run-count {
+  border-color: color-mix(in srgb, var(--surface-2) 36%, transparent);
+  background: color-mix(in srgb, var(--crust) 40%, var(--base));
+  box-shadow: var(--neu-inset);
+}
+.field input:hover,
+.field select:hover,
+.model-picker-trigger:hover,
+.model-picker.open .model-picker-trigger {
+  border-color: color-mix(in srgb, var(--mauve) 65%, var(--surface-1));
+  background: var(--base);
+}
+.field input:focus,
+.field select:focus,
+.model-picker.open .model-picker-trigger {
+  box-shadow: var(--neu-inset), 0 0 0 2px color-mix(in srgb, var(--mauve) 20%, transparent);
+}
+.model-picker-popover {
+  border-color: color-mix(in srgb, var(--surface-2) 55%, transparent);
+  background: var(--base);
+  box-shadow: 9px 11px 24px rgb(17 17 27 / .72), inset 1px 1px var(--neu-light-soft);
+}
+.model-picker-meta { background: color-mix(in srgb, var(--mantle) 55%, var(--base)); }
+.model-option { transition: color .16s, box-shadow .16s, background .16s; }
+.model-option.highlighted {
+  color: var(--mauve);
+  background: var(--base);
+  box-shadow: var(--neu-inset-soft);
+}
+
+.race-options,
+.lane-metrics,
+th {
+  border-color: color-mix(in srgb, var(--surface-2) 30%, transparent);
+  background: color-mix(in srgb, var(--mantle) 38%, var(--base));
+  box-shadow: inset 0 5px 12px var(--neu-dark-soft), inset 0 -1px var(--neu-light-soft);
+}
+.review-meta div,
+.metric {
+  border-color: color-mix(in srgb, var(--surface-2) 30%, transparent);
+  background: var(--base);
+  box-shadow: var(--neu-inset-soft);
+}
+
+.segmented button,
+.preset-grid button,
+.primary-button,
+.secondary-button,
+.launch-button,
+.cancel-button,
+.icon-button,
+.add-competitor {
+  border-color: color-mix(in srgb, var(--surface-2) 38%, transparent);
+  background: var(--base);
+  box-shadow: var(--neu-raised-soft), inset 1px 1px color-mix(in srgb, var(--surface-2) 28%, transparent);
+  transition: transform .16s, color .16s, background .16s, border-color .16s, box-shadow .16s;
+}
+.primary-button {
+  color: var(--crust);
+  border-color: color-mix(in srgb, var(--mauve) 72%, var(--surface-1));
+  background: var(--mauve);
+  box-shadow: 3px 3px 8px var(--neu-dark), inset 1px 1px rgb(255 255 255 / .16);
+}
+.launch-button { border-color: color-mix(in srgb, var(--mauve) 64%, var(--surface-1)); }
+.segmented button:hover,
+.preset-grid button:hover,
+.secondary-button:hover,
+.launch-button:hover,
+.cancel-button:hover,
+.icon-button:hover:not(:disabled),
+.add-competitor:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--mauve) 7%, var(--base));
+  box-shadow: 4px 4px 9px var(--neu-dark-soft), -2px -2px 5px var(--neu-light-soft);
+}
+.primary-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 4px 4px 10px var(--neu-dark);
+}
+.segmented button.active,
+.preset-grid button.active,
+.segmented button:active,
+.preset-grid button:active,
+.primary-button:active:not(:disabled),
+.secondary-button:active,
+.launch-button:active,
+.cancel-button:active,
+.icon-button:active:not(:disabled),
+.add-competitor:active {
+  transform: translateY(1px);
+  border-color: color-mix(in srgb, var(--mauve) 58%, var(--surface-1));
+  background: color-mix(in srgb, var(--mauve) 8%, var(--base));
+  box-shadow: var(--neu-inset);
+}
+.primary-button:active:not(:disabled) { color: var(--mauve); }
+.primary-button:disabled { box-shadow: var(--neu-inset-soft); }
+.radio-mark { box-shadow: var(--neu-inset-soft); }
+.radio-mark span { box-shadow: none; }
+
+.starting-lights { box-shadow: var(--neu-inset); }
+.starting-lights span { box-shadow: inset 2px 2px 4px rgb(17 17 27 / .5), inset -1px -1px 3px rgb(255 255 255 / .14); }
+.launch-button > span { box-shadow: 3px 3px 7px var(--neu-dark), inset 1px 1px rgb(255 255 255 / .16); }
+.overall-progress {
+  border-color: color-mix(in srgb, var(--surface-2) 38%, transparent);
+  background: var(--base);
+  box-shadow: none;
+}
+.progress-track span,
+.lane-progress span { box-shadow: none; }
+.race-lane.status-running {
+  box-shadow: var(--neu-raised), inset 1px 1px color-mix(in srgb, var(--lane-color) 13%, transparent);
+}
+.stream-toolbar { border-color: color-mix(in srgb, var(--surface-2) 32%, transparent); }
+
+.results-table { box-shadow: var(--neu-raised); }
+td { border-color: color-mix(in srgb, var(--surface-2) 28%, transparent); }
+tbody tr:hover { background: color-mix(in srgb, var(--mauve) 5%, var(--base)); box-shadow: var(--neu-inset-soft); }
+.invalid-results { box-shadow: var(--neu-raised-soft); }
+
+/* Simplified race setup */
+.brand-logo {
+  display: block;
+  flex: 0 0 auto;
+  object-fit: contain;
+  filter: invert(92%) sepia(8%) saturate(558%) hue-rotate(191deg) brightness(99%) contrast(93%);
+  opacity: .92;
+}
+
+.connection {
+  padding-inline: 2px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.setup-view { width: min(740px, 100%); margin: 0 auto; padding: clamp(38px, 6vw, 68px) 0 100px; }
+.setup-workbench.panel {
+  overflow: visible;
+  border: 1px solid color-mix(in srgb, var(--surface-1) 42%, transparent);
+  border-radius: 20px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--surface-0) 14%, var(--base)), var(--base) 58%);
+  box-shadow: 12px 14px 30px rgb(11 11 19 / .42), -5px -5px 14px var(--neu-light-soft), inset 1px 1px color-mix(in srgb, var(--surface-2) 22%, transparent);
+}
+.setup-intro { padding: 23px 26px 18px; display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; }
+.setup-intro .eyebrow { margin-bottom: 10px; }
+.setup-intro h1 { margin: 0; font-size: clamp(31px, 4vw, 40px); line-height: 1; letter-spacing: -.045em; }
+.setup-count { flex: 0 0 auto; margin-top: 1px; color: var(--text); font: 750 13px/1 var(--mono); }
+.setup-count small { color: var(--overlay-1); font: inherit; }
+.setup-content { padding: 0 26px; }
+.competitor-list {
+  width: 100%;
+  margin-inline: auto;
+  grid-template-columns: 1fr;
+  gap: 0;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--surface-1) 38%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--crust) 54%, var(--mantle));
+  box-shadow: inset 4px 4px 10px rgb(11 11 19 / .46), inset -2px -2px 7px rgb(69 71 90 / .13);
+}
+.competitor-card {
+  width: 100%;
+  justify-self: stretch;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-rows: auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 68px;
+  padding: 5px 6px 5px 10px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--surface-0) 72%, transparent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: grid-template-columns .22s ease, gap .22s ease;
+}
+.competitor-card:has(.remove-button.is-hidden) { grid-template-columns: minmax(0, 1fr) 0; gap: 0; }
+.competitor-card:last-of-type { border-bottom: 0; }
+.competitor-list:has(.add-competitor) .competitor-card:last-of-type { border-bottom: 1px solid color-mix(in srgb, var(--surface-0) 72%, transparent); }
+.competitor-card::before { inset: 15px auto 15px 0; width: 3px; border-radius: 3px; box-shadow: none; }
+.remove-button {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  justify-self: end;
+  overflow: hidden;
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0) scale(1);
+  transition: width .22s ease, opacity .16s ease, transform .22s ease, visibility 0s;
+}
+.remove-button.is-hidden {
+  width: 0;
+  padding-inline: 0;
+  border: 0;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(8px) scale(.72);
+  pointer-events: none;
+  transition: width .22s ease, opacity .14s ease, transform .22s ease, visibility 0s linear .22s;
+}
+@starting-style {
+  .remove-button:not(.is-hidden) { opacity: 0; transform: translateX(8px) scale(.72); }
+}
+.add-competitor {
+  width: calc(100% - 12px);
+  justify-self: center;
+  min-height: 46px;
+  margin: 6px;
+  border: 1px solid color-mix(in srgb, var(--surface-1) 38%, transparent);
+  border-radius: 10px;
+  background: var(--base);
+  box-shadow: 3px 3px 7px rgb(11 11 19 / .4), -1px -1px 4px rgb(69 71 90 / .12), inset 1px 1px rgb(255 255 255 / .035);
+}
+.setup-content .inline-warning { margin-top: 12px; border: 1px solid color-mix(in srgb, var(--peach) 25%, var(--surface-0)); border-radius: 10px; box-shadow: var(--neu-inset-soft); }
+.setup-content > .empty-state { min-height: 260px; }
+.setup-actions { padding: 18px 26px 26px; }
+.setup-actions .primary-button { width: 100%; min-height: 50px; border-radius: 12px; box-shadow: 4px 5px 11px rgb(11 11 19 / .48), -2px -2px 6px rgb(69 71 90 / .1), inset 1px 1px rgb(255 255 255 / .16); }
+.setup-actions .primary-button:disabled { transform: none; box-shadow: inset 3px 3px 7px rgb(11 11 19 / .38), inset -1px -1px 4px rgb(69 71 90 / .08); }
+
+.racer-picker { min-width: 0; position: relative; }
+.racer-picker-trigger {
+  width: 100%;
+  min-height: 58px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--surface-2) 48%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--mantle) 34%, var(--base));
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s, background .16s;
+}
+.racer-picker-trigger:hover, .racer-picker.open .racer-picker-trigger { border-color: color-mix(in srgb, var(--mauve) 64%, var(--surface-1)); background: var(--base); }
+.competitor-card .racer-picker-trigger { min-height: 56px; border: 0; border-radius: 10px; background: transparent; box-shadow: none; transition: background .16s, box-shadow .16s, transform .16s; }
+.competitor-card .racer-picker-trigger:hover, .competitor-card .racer-picker.open .racer-picker-trigger { background: var(--base); box-shadow: 3px 3px 7px rgb(11 11 19 / .4), -1px -1px 4px rgb(69 71 90 / .12), inset 1px 1px rgb(255 255 255 / .035); transform: translateY(-1px); }
+.competitor-card .racer-picker-trigger:active { transform: translateY(1px); box-shadow: var(--neu-inset-soft); }
+.racer-picker-cue { color: var(--overlay-1); transition: color .16s; }
+.racer-picker.open .racer-picker-cue { color: var(--mauve); }
+.racer-picker-logo, .racer-option-logo { width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--surface-2) 42%, transparent); border-radius: 9px; background: var(--base); }
+.competitor-card .racer-picker-logo { box-shadow: var(--neu-inset-soft); }
+.racer-option-logo { width: 32px; height: 32px; border-radius: 8px; }
+.racer-picker-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.racer-picker-copy strong, .racer-picker-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.racer-picker-copy strong { font-size: 14px; }
+.racer-picker-copy small { color: var(--overlay-2); font: 550 10px/1 var(--mono); }
+.racer-picker-layer { position: fixed; z-index: 99; inset: 0; }
+.racer-picker-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; background: rgb(17 17 27 / .56); backdrop-filter: blur(2px); box-shadow: none; cursor: default; }
+.racer-picker-popover { position: fixed; z-index: 100; top: 50%; left: 50%; width: min(720px, calc(100vw - 40px)); height: min(70dvh, 560px); display: grid; grid-template-columns: 68px minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr); overflow: hidden; transform: translate(-50%, -50%); border: 1px solid var(--surface-1); border-radius: 15px; background: var(--base); box-shadow: 14px 18px 46px rgb(11 11 19 / .72), -4px -4px 12px rgb(69 71 90 / .1), inset 1px 1px rgb(255 255 255 / .04); }
+.racer-picker-sidebar { grid-column: 1; grid-row: 1 / 3; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 5px; border-right: 1px solid var(--surface-0); background: color-mix(in srgb, var(--mantle) 48%, var(--base)); }
+.racer-picker-sidebar button { width: 44px; height: 44px; display: grid; place-items: center; position: relative; color: var(--overlay-1); border: 0; border-radius: 9px; background: transparent; cursor: pointer; }
+.racer-picker-sidebar button:hover { color: var(--text); background: color-mix(in srgb, var(--surface-0) 72%, transparent); }
+.racer-picker-sidebar button.active { color: var(--text); background: var(--surface-0); }
+.racer-picker-sidebar button.active::after { content: ""; position: absolute; inset: 8px auto 8px -8px; width: 3px; border-radius: 0 4px 4px 0; background: var(--mauve); }
+.racer-picker-search { grid-column: 2; grid-row: 1; padding: 0 14px; display: flex; align-items: center; gap: 10px; color: var(--overlay-1); border-bottom: 1px solid var(--surface-0); }
+.racer-picker-search:focus-within { color: var(--mauve); border-color: var(--mauve); box-shadow: inset 0 -1px var(--mauve); }
+.racer-picker-search input { min-width: 0; height: 50px; flex: 1; color: var(--text); border: 0; outline: 0; background: transparent; font-size: 13px; }
+.racer-picker-search input:focus-visible { outline: 0; }
+.racer-picker-search input::placeholder { color: var(--overlay-0); }
+.racer-picker-close { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; color: var(--overlay-1); border: 1px solid color-mix(in srgb, var(--surface-1) 42%, transparent); border-radius: 8px; background: var(--base); box-shadow: var(--neu-raised-soft); cursor: pointer; }
+.racer-picker-close:hover { color: var(--text); border-color: var(--mauve); }
+.racer-picker-close:active { box-shadow: var(--neu-inset-soft); }
+.racer-picker-options { grid-column: 2; grid-row: 2; min-height: 0; overflow-y: auto; padding: 7px; scrollbar-color: var(--surface-2) transparent; }
+.racer-picker-pane-label { height: 32px; padding: 0 9px; display: flex; align-items: center; gap: 7px; color: var(--overlay-2); font: 650 9px/1 var(--mono); text-transform: uppercase; letter-spacing: .05em; }
+.racer-picker-pane-label strong { color: var(--subtext-1); }
+.racer-picker-pane-label > span { margin-left: auto; }
+.racer-picker-option { width: 100%; min-height: 54px; padding: 7px 9px; display: flex; align-items: center; gap: 9px; color: var(--text); border: 0; border-radius: 9px; background: transparent; text-align: left; cursor: pointer; }
+.racer-picker-option.highlighted { background: var(--surface-0); }
+.racer-picker-option > span:nth-child(2) { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.racer-picker-option strong, .racer-picker-option small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.racer-picker-option strong { font-size: 13px; }
+.racer-picker-option small { color: var(--overlay-2); font: 500 9px/1 var(--mono); }
+.racer-picker-option em { padding: 4px 5px; color: var(--yellow); border: 1px solid color-mix(in srgb, var(--yellow) 32%, var(--surface-0)); border-radius: 5px; font: 700 8px/1 var(--mono); font-style: normal; }
+.racer-picker-option > svg { color: transparent; }
+.racer-picker-option > svg.selected { color: var(--green); }
+.racer-picker-empty { min-height: 110px; display: grid; place-items: center; color: var(--overlay-1); font-size: 12px; }
+
+.race-options { padding: 18px; border: 1px solid color-mix(in srgb, var(--surface-1) 38%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--crust) 38%, var(--mantle)); box-shadow: var(--neu-inset-soft); }
+.race-options .step { width: 23px; height: 23px; }
+.starting-grid-options { align-items: end; }
+.starting-grid-options .option-group { display: flex; flex-direction: column; }
+.starting-grid-options .option-label { min-height: 18px; margin-bottom: 9px; }
+.segmented button, .preset-grid button { height: 58px; min-height: 58px; border-color: color-mix(in srgb, var(--surface-2) 36%, transparent); background: var(--base); box-shadow: var(--neu-raised-soft), inset 1px 1px color-mix(in srgb, var(--surface-2) 20%, transparent); }
+.segmented button:hover, .preset-grid button:hover { transform: translateY(-1px); box-shadow: 4px 4px 9px var(--neu-dark-soft), -2px -2px 5px var(--neu-light-soft); }
+.segmented button.active, .preset-grid button.active { transform: translateY(1px); border-color: color-mix(in srgb, var(--mauve) 56%, var(--surface-1)); background: color-mix(in srgb, var(--mauve) 7%, var(--base)); box-shadow: var(--neu-inset); }
+.preset-grid button { min-height: 58px; height: 58px; grid-template-columns: 14px minmax(0, 1fr); align-items: center; }
+.preset-grid button > span:nth-child(2) { gap: 5px; }
+.preset-grid small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-footer { min-height: 72px; justify-content: flex-end; padding: 13px 0; border-top: 0; }
+.setup-panel .panel-footer { width: 100%; margin-inline: auto; justify-content: flex-start; }
+.panel-footer .primary-button { min-width: 205px; }
+
+.review-view .back-button { min-height: 36px; padding: 0 12px; border: 1px solid color-mix(in srgb, var(--surface-1) 38%, transparent); border-radius: 10px; background: var(--base); box-shadow: var(--neu-raised-soft); }
+.review-view .back-button:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--mauve) 50%, var(--surface-1)); box-shadow: 4px 4px 9px var(--neu-dark-soft), -2px -2px 5px var(--neu-light-soft); }
+.review-view .back-button:active { transform: translateY(1px); box-shadow: var(--neu-inset-soft); }
+.review-grid.panel { grid-template-columns: 1fr; gap: 12px; padding: 10px; border: 1px solid color-mix(in srgb, var(--surface-1) 42%, transparent); border-radius: 18px; background: linear-gradient(145deg, color-mix(in srgb, var(--surface-0) 8%, var(--base)), var(--base) 60%); box-shadow: 10px 12px 28px rgb(11 11 19 / .38), -4px -4px 12px var(--neu-light-soft), inset 1px 1px color-mix(in srgb, var(--surface-2) 20%, transparent); }
+.review-meta { grid-template-columns: repeat(3, 1fr); }
+.review-meta div { min-height: 60px; border: 0; border-right: 1px solid var(--surface-0); border-radius: 0; background: transparent; box-shadow: none; }
+.review-meta div:last-child { border-right: 0; }
+.review-racers { grid-column: 1; grid-row: auto; gap: 0; padding: 6px; border: 1px solid color-mix(in srgb, var(--surface-1) 34%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--crust) 42%, var(--mantle)); box-shadow: var(--neu-inset-soft); }
+.review-racer { min-height: 76px; padding: 9px 10px 9px 14px; display: grid; grid-template-columns: 32px 32px minmax(0, 1fr) minmax(220px, .8fr); gap: 12px; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--surface-0) 78%, transparent); border-radius: 0; background: transparent; box-shadow: none; }
+.review-racer:last-child { border-bottom: 0; }
+.review-racer::before { inset: 18px auto 18px 1px; width: 3px; border-radius: 3px; box-shadow: none; }
+.review-racer-model { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.review-racer-model strong, .review-racer-model span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.review-racer-model strong { font-size: 14px; }
+.review-racer-model span { color: var(--overlay-2); font: 500 10px/1 var(--mono); }
+.review-name { display: flex; flex-direction: column; gap: 6px; }
+.review-name > span { color: var(--overlay-2); font: 650 9px/1 var(--mono); text-transform: uppercase; letter-spacing: .04em; }
+.review-name input { width: 100%; height: 44px; padding: 0 12px; color: var(--text); border: 1px solid color-mix(in srgb, var(--surface-2) 38%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--crust) 58%, var(--base)); box-shadow: inset 3px 3px 7px rgb(11 11 19 / .5), inset -2px -2px 5px rgb(69 71 90 / .14); transition: border-color .16s, box-shadow .16s, background .16s; }
+.review-name input:hover { border-color: color-mix(in srgb, var(--surface-2) 68%, transparent); background: color-mix(in srgb, var(--crust) 52%, var(--base)); }
+.review-name input:focus { border-color: var(--mauve); background: var(--base); box-shadow: inset 3px 3px 7px rgb(11 11 19 / .5), inset -2px -2px 5px rgb(69 71 90 / .14), 0 0 0 2px color-mix(in srgb, var(--mauve) 18%, transparent); }
+.review-name input:focus-visible { outline: 0; }
+.review-grid .launch-button { width: min(270px, 100%); justify-self: end; margin: 2px 2px 4px; box-shadow: 5px 6px 13px var(--neu-dark), -2px -2px 7px var(--neu-light-soft), inset 1px 1px color-mix(in srgb, var(--surface-2) 24%, transparent); }
+.review-grid .launch-button:disabled { opacity: .42; cursor: not-allowed; box-shadow: var(--neu-inset-soft); }
+
+footer { min-height: 82px; border-top-color: color-mix(in srgb, var(--surface-1) 48%, transparent); }
+.footer-brand { display: flex; align-items: center; gap: 9px; }
+.footer-brand > svg { color: var(--mauve); }
+.footer-brand strong { color: var(--text); font-size: 13px; }
+.footer-brand strong b { color: var(--mauve); }
+.footer-brand > span { margin-left: 5px; color: var(--overlay-1); font: 500 10px/1 var(--mono); }
+.footer-note { color: var(--overlay-1); font: 550 10px/1 var(--mono); letter-spacing: .01em; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -416,8 +819,6 @@ footer button:disabled { opacity: .45; cursor: not-allowed; }
   .hero { grid-template-columns: 1fr; }
   .hero-track { grid-column: 1; grid-row: auto; min-height: 130px; margin-top: 28px; transform: none; }
   .competitor-list { grid-template-columns: 1fr; }
-  .finish-deck { grid-template-columns: 1fr; }
-  .runner-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .about-hero { grid-template-columns: 1fr; }
   .about-thesis { max-width: 470px; transform: none; }
   .stack-equation { display: grid; grid-template-columns: repeat(3, 1fr); }
@@ -433,17 +834,12 @@ footer button:disabled { opacity: .45; cursor: not-allowed; }
   .connection svg { width: 16px; height: 16px; }
   .about-button { padding: 7px; font-size: 0; }
   .about-button svg { width: 16px; height: 16px; }
-  .setup-view { padding-top: 38px; }
-  .hero h1, .section-intro h1, .results-hero h1 { font-size: 41px; }
+  .hero h1 { font-size: 38px; }
+  .section-intro h1, .results-hero h1 { font-size: 41px; }
   .hero > p { font-size: 14px; }
   .hero-track { min-height: 115px; }
   .panel-heading { padding-inline: 15px; }
   .count { display: none; }
-  .competitor-list { padding: 12px; }
-  .competitor-card { grid-template-columns: 38px minmax(0, 1fr) 32px; grid-template-rows: auto; }
-  .grid-position { grid-column: 1; grid-row: 1 / 4; }
-  .harness-field, .model-field, .label-field { grid-column: 2; }
-  .remove-button { grid-column: 3; grid-row: 1; }
   .race-options { grid-template-columns: 1fr; padding: 18px 13px; }
   .panel-footer { align-items: stretch; flex-direction: column; }
   .panel-footer .primary-button { width: 100%; }
@@ -454,13 +850,12 @@ footer button:disabled { opacity: .45; cursor: not-allowed; }
   .launch-button { grid-column: 1; }
   .race-header { align-items: flex-start; flex-direction: column; }
   .race-header-right { width: 100%; justify-content: space-between; }
-  .overall-progress { top: 69px; }
-  .results-hero { align-items: flex-start; }
-  .checker-strip { width: 90px; height: 40px; }
-  .winner-card { min-height: 0; grid-template-columns: 1fr; }
-  .winner-kicker, .winner-metrics { grid-column: 1; }
-  .winner-time { align-items: flex-start; }
-  .runner-stack { grid-template-columns: 1fr; }
+  .podium-showcase, .podium-grid { min-height: 280px; }
+  .podium-grid { padding: 18px 14px 0; }
+  .podium-entry.rank-1 { --step-height: 82px; }
+  .podium-entry.rank-2 { --step-height: 60px; }
+  .podium-entry.rank-3 { --step-height: 44px; }
+  .podium-identity { padding-bottom: 12px; }
   .table-scroll { overflow: visible; }
   table { min-width: 0; }
   thead { display: none; }
@@ -489,7 +884,8 @@ footer button:disabled { opacity: .45; cursor: not-allowed; }
 }
 
 @media (max-width: 520px) {
-  .hero h1, .section-intro h1, .results-hero h1, .about-hero h1 { font-size: 36px; }
+  .hero h1 { font-size: 34px; }
+  .section-intro h1, .results-hero h1, .about-hero h1 { font-size: 36px; }
   .hero-stats { align-items: flex-start; flex-direction: column; }
   .preset-grid { flex-direction: column; }
   .narrow-view { padding-top: 35px; }
@@ -503,10 +899,6 @@ footer button:disabled { opacity: .45; cursor: not-allowed; }
   .metric strong { font-size: 18px; }
   .metric:nth-child(3) strong { font-size: 22px; }
   .stream-window { height: 225px; }
-  .results-hero { flex-direction: column; }
-  .checker-strip { align-self: flex-end; margin-top: -45px; }
-  .winner-metrics { grid-template-columns: 1fr 1fr; }
-  .winner-metrics > span:last-child { grid-column: 1 / 3; }
   .results-actions { align-items: stretch; flex-direction: column; }
   .stack-equation { grid-template-columns: 1fr 1fr; }
   .stack-equation .stack-result { grid-column: 1 / 3; }
@@ -520,4 +912,64 @@ footer button:disabled { opacity: .45; cursor: not-allowed; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+@media (max-width: 760px) {
+  .setup-view { width: 100%; padding: 30px 0 72px; }
+  .setup-workbench.panel { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  .setup-intro { padding: 0 0 20px; gap: 18px; }
+  .setup-intro h1 { font-size: 34px; }
+  .setup-content { padding: 0; }
+  .competitor-list { padding: 5px; }
+  .competitor-card { grid-template-columns: minmax(0, 1fr) 32px; padding: 5px 4px 5px 8px; }
+  .remove-button { grid-column: 2; grid-row: 1; }
+  .racer-picker { grid-column: 1; }
+  .setup-actions { padding: 16px 0 0; }
+  .race-options { padding: 14px; }
+  .panel-footer { padding-inline: 0; }
+  .review-grid.panel { padding: 8px; border-radius: 15px; }
+  .review-meta { grid-template-columns: 1fr 1fr 1fr; }
+  .review-meta div { padding-inline: 9px; }
+  .review-racers { padding: 4px; }
+  .review-racer { grid-template-columns: 30px 30px minmax(0, 1fr); gap: 10px; padding: 10px; }
+  .review-name { grid-column: 3; }
+  .review-grid .launch-button { width: 100%; }
+  footer { align-items: flex-start; flex-direction: column; justify-content: center; gap: 10px; }
+  .footer-brand > span { display: inline; }
+}
+
+@media (max-width: 520px) {
+  .setup-intro { gap: 12px; }
+  .setup-intro h1 { font-size: 31px; }
+  .setup-count { margin-top: 3px; }
+  .competitor-card { width: 100%; justify-self: stretch; }
+  .racer-picker-trigger { min-height: 56px; padding-inline: 9px; }
+  .racer-picker-logo { width: 32px; height: 32px; }
+  .racer-picker-copy small { max-width: 180px; }
+  .racer-picker-popover { position: fixed; inset: auto 12px 12px; width: auto; height: min(72dvh, 560px); grid-template-columns: 1fr; grid-template-rows: 52px 52px minmax(0, 1fr); transform: none; }
+  .racer-picker-sidebar { grid-column: 1; grid-row: 1; padding: 5px 8px; flex-direction: row; justify-content: flex-start; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--surface-0); }
+  .racer-picker-sidebar button { width: 40px; height: 40px; flex: 0 0 auto; }
+  .racer-picker-sidebar button.active::after { inset: auto 8px -5px; width: auto; height: 3px; border-radius: 4px 4px 0 0; }
+  .racer-picker-search { grid-column: 1; grid-row: 2; }
+  .racer-picker-options { grid-column: 1; grid-row: 3; overscroll-behavior: contain; }
+  .section-intro .starting-lights { align-self: flex-end; margin-top: 0; }
+  .review-meta { grid-template-columns: 1fr; }
+  .review-meta div { border-right: 0; border-bottom: 1px solid var(--surface-0); }
+  .podium-showcase, .podium-grid { min-height: 238px; }
+  .podium-showcase { border-radius: 14px; }
+  .podium-grid { padding: 12px 8px 0; }
+  .podium-entry.rank-1 { --step-height: 70px; }
+  .podium-entry.rank-2 { --step-height: 52px; }
+  .podium-entry.rank-3 { --step-height: 38px; }
+  .podium-identity { padding: 0 4px 10px; gap: 4px; }
+  .podium-rank { font-size: 8px; }
+  .podium-identity .harness-mark { width: 31px; height: 31px; border-radius: 9px; }
+  .podium-entry.rank-1 .harness-mark { width: 36px; height: 36px; }
+  .podium-identity strong, .podium-entry.rank-1 .podium-identity strong { font-size: 11px; }
+  .podium-entry.rank-1 .podium-identity strong { font-size: 13px; }
+  .podium-identity small { display: none; }
+  .podium-identity b { font-size: 18px; }
+  .podium-entry.rank-1 .podium-identity b { font-size: 24px; }
+  .podium-step span { font-size: 25px; }
+  .footer-brand > span { display: none; }
 }
