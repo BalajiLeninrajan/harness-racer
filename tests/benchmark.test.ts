@@ -89,6 +89,39 @@ describe("benchmark engine", () => {
     });
   });
 
+  it("identifies warmup errors even when a heat fails before emitting status", async () => {
+    const request: BenchmarkRequest = {
+      type: "start",
+      mode: "sequential",
+      samplePreset: "standard",
+      competitors: [
+        { id: "a", harness: "codex", model: "alpha", label: "Alpha", color: "#fff" },
+      ],
+    };
+    const events: ServerEvent[] = [];
+
+    await runBenchmark(
+      request,
+      [],
+      new AbortController().signal,
+      (event) => events.push(event),
+    );
+
+    expect(events.some((event) => event.type === "run.status")).toBe(false);
+    const errors = events.filter((event) => event.type === "run.error");
+    expect(errors).toHaveLength(8);
+    expect(errors.map((event) => event.warmup)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+  });
+
   it("does not report completion when a parallel heat is cancelled", async () => {
     const controller = new AbortController();
     const cancellation = new Error("cancelled by test");

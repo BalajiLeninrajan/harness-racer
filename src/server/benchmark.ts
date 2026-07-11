@@ -188,6 +188,7 @@ async function runParallel(
       competitorId: competitor.id,
       workload: workload.id,
       sample,
+      warmup,
       message: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
     });
   });
@@ -219,6 +220,7 @@ async function runSequential(
         competitorId: competitor.id,
         workload: workload.id,
         sample,
+        warmup,
         message: error instanceof Error ? error.message : String(error),
       });
     }
@@ -257,7 +259,14 @@ export async function runBenchmark(
         if (signal.aborted) throw error;
         const message = error instanceof Error ? error.message : String(error);
         for (const competitor of request.competitors) {
-          emit({ type: "run.error", competitorId: competitor.id, workload: workload.id as WorkloadId, sample, message });
+          emit({
+            type: "run.error",
+            competitorId: competitor.id,
+            workload: workload.id as WorkloadId,
+            sample,
+            warmup,
+            message,
+          });
         }
       }
     }

@@ -20,9 +20,11 @@ describe("CLI help", () => {
       const output = await runCli(...args);
       expect(output).toContain("Usage: tps-racer [options]");
       expect(output).toContain("--cli");
-      expect(output).toContain("Terminal UI:");
-      expect(output).toContain("Space          Choose a model");
-      expect(output).toContain("Enter          Continue, start the race, or finish");
+      expect(output).toContain("Terminal workbench:");
+      expect(output).toContain("Space           Select or remove a racer");
+      expect(output).toContain("Ctrl-P          Open the command palette");
+      expect(output).toContain("requires Bun");
+      expect(output).not.toContain("j/k");
     },
   );
 });

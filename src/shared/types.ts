@@ -108,7 +108,14 @@ export type ServerEvent =
       liveVisibleTokensPerSecond?: number;
     }
   | { type: "run.complete"; result: RunResult }
-  | { type: "run.error"; competitorId: string; workload: WorkloadId; sample: number; message: string }
+  | {
+      type: "run.error";
+      competitorId: string;
+      workload: WorkloadId;
+      sample: number;
+      warmup: boolean;
+      message: string;
+    }
   | { type: "benchmark.complete"; results: RunResult[]; summary: SummaryRow[] }
   | { type: "benchmark.cancelled" }
   | { type: "error"; message: string };

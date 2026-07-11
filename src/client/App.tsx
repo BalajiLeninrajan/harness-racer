@@ -345,15 +345,23 @@ export function App() {
 
     if (event.type === "run.error") {
       setCompletedRuns((current) => current + 1);
-      setLanes((current) => ({
-        ...current,
-        [event.competitorId]: {
-          ...(current[event.competitorId] ?? emptyLane()),
-          status: "error",
-          error: event.message,
-          completedRuns: (current[event.competitorId]?.completedRuns ?? 0) + 1,
-        },
-      }));
+      setLanes((current) => {
+        const previous = current[event.competitorId] ?? emptyLane();
+        const newRun = previous.workload !== event.workload || previous.sample !== event.sample || previous.warmup !== event.warmup;
+        return {
+          ...current,
+          [event.competitorId]: {
+            ...previous,
+            output: newRun ? "" : previous.output,
+            status: "error",
+            workload: event.workload,
+            sample: event.sample,
+            warmup: event.warmup,
+            error: event.message,
+            completedRuns: previous.completedRuns + 1,
+          },
+        };
+      });
       return;
     }
 

@@ -1,7 +1,6 @@
-import { defineConfig } from "tsup";
+import { defineConfig, type Options } from "tsup";
 
-export default defineConfig({
-  entry: ["src/cli.ts"],
+const shared: Options = {
   format: ["esm"],
   platform: "node",
   target: "node22",
@@ -9,6 +8,19 @@ export default defineConfig({
   clean: false,
   splitting: false,
   sourcemap: true,
-  external: ["vite"],
-  banner: { js: "#!/usr/bin/env node" },
-});
+  external: ["vite", "@opentui/core", "@opentui/react"],
+};
+
+export default defineConfig([
+  {
+    ...shared,
+    entry: { cli: "src/cli.ts" },
+    banner: { js: "#!/usr/bin/env node" },
+  },
+  {
+    ...shared,
+    entry: { tui: "src/tui-entry.ts" },
+    target: "esnext",
+    banner: { js: "#!/usr/bin/env bun" },
+  },
+]);

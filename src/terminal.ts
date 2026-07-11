@@ -46,7 +46,7 @@ export interface TerminalModeOptions {
   ui?: "auto" | "tui" | "line";
 }
 
-export type TerminalModeResult = "completed" | "cancelled" | "declined" | "unavailable";
+export type TerminalModeResult = "completed" | "cancelled" | "declined" | "failed" | "unavailable";
 
 export interface ProbedAdapter {
   adapter: HarnessAdapter;
@@ -286,25 +286,17 @@ export function createTerminalEventRenderer(
   competitors: readonly Competitor[],
 ): (event: ServerEvent) => void {
   const labels = new Map(competitors.map((competitor) => [competitor.id, competitor.label]));
-  const warmups = new Map<string, boolean>();
   let totalRuns = 0;
   let completedRuns = 0;
-
-  const runKey = (competitorId: string, workload: string, sample: number) =>
-    `${competitorId}\u0000${workload}\u0000${sample}`;
 
   return (event) => {
     if (event.type === "run.delta" || event.type === "providers") return;
 
-    if (event.type === "run.status") {
-      warmups.set(runKey(event.competitorId, event.workload, event.sample), event.warmup);
-      return;
-    }
+    if (event.type === "run.status") return;
 
     if (event.type === "benchmark.started") {
       totalRuns = event.totalRuns;
       completedRuns = 0;
-      warmups.clear();
       writer.write(`\nRace started (${totalRuns} runs). Press Ctrl-C to cancel.\n`);
       return;
     }
@@ -324,9 +316,7 @@ export function createTerminalEventRenderer(
     if (event.type === "run.error") {
       completedRuns += 1;
       const label = labels.get(event.competitorId) ?? event.competitorId;
-      const heat = warmups.get(runKey(event.competitorId, event.workload, event.sample))
-        ? "warmup"
-        : `sample ${event.sample}`;
+      const heat = event.warmup ? "warmup" : `sample ${event.sample}`;
       writer.write(`  [${completedRuns}/${totalRuns || "?"}] ${label} · ${event.workload} ${heat} — error: ${event.message}\n`);
       return;
     }
@@ -351,20 +341,22 @@ export async function runTerminalMode(options: TerminalModeOptions = {}): Promis
   const writer = options.output ?? stdout;
   const input = options.input ?? stdin;
 
-  if (!options.questioner && options.ui !== "line") {
+  const usesInjectedRuntime = options.adapters !== undefined || options.runBenchmark !== undefined;
+  if (!options.questioner && options.ui !== "line" && !usesInjectedRuntime) {
     const { runTerminalTui, supportsTerminalTui } = await import("./tui/index.js");
     const useTui = options.ui === "tui" || supportsTerminalTui(input, writer);
     if (useTui) {
       return runTerminalTui({
-        adapters: adapterList,
-        runBenchmark: benchmark,
-        probeAdapters,
         input,
         output: writer,
         signal: options.signal,
         handleSigint: options.handleSigint,
       });
     }
+  }
+
+  if (options.ui === "tui" && usesInjectedRuntime) {
+    throw new Error("The native TUI runs in a separate Bun process and cannot use injected adapters or benchmark runners. Use ui: \"line\" for programmatic runs.");
   }
 
   let questioner = options.questioner;

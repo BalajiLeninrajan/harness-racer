@@ -16,21 +16,25 @@ const help = `TPS Racer
 Usage: tps-racer [options]
 
 Options:
-  --cli          Open the interactive terminal UI
+  --cli          Open the native terminal workbench (requires Bun)
   --no-open      Start the browser app without opening it automatically
   --port <port>  Set the browser app's loopback port (default: 4317)
   -h, --help     Show this help
 
-Terminal UI:
-  ↑/↓ or j/k     Move between racers or choices
-  ←/→ or h/l     Change the selected harness
-  Space          Choose a model or select a filtered choice
-  Enter          Continue, start the race, or finish
-  A / D          Add or remove a racer
-  M / P          Cycle run mode or sample preset
-  R / E          Race again or edit the finished grid
-  Q / Esc        Leave the current screen
-  Ctrl-C         Stop immediately and clean up
+Terminal workbench:
+  Mouse           Select racers and scroll output
+  Arrows          Navigate the roster or leaderboard
+  Tab             Focus the next racer pane
+  Space           Select or remove a racer
+  Enter           Start the race
+  S               Open the racer roster
+  I               Open the race inspector
+  Ctrl-P          Open the command palette
+  Ctrl-C          Stop the active race or exit
+  Q               Stop an active race or quit
+
+The browser app runs on Node. The native terminal workbench uses OpenTUI and
+launches through Bun; install Bun and make sure it is on PATH.
 
 Examples:
   tps-racer --cli
@@ -45,8 +49,8 @@ async function main(): Promise<void> {
 
   if (args.has("--cli")) {
     const { runTerminalMode } = await import("./terminal.js");
-    const result = await runTerminalMode();
-    if (result === "unavailable") process.exitCode = 1;
+    const result = await runTerminalMode({ ui: "tui" });
+    if (result === "failed" || result === "unavailable") process.exitCode = 1;
     if (result === "cancelled") process.exitCode = 130;
     return;
   }

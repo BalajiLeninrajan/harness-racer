@@ -1,12 +1,31 @@
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import {
+  accessSync,
+  chmodSync,
+  constants,
+  copyFileSync,
+  mkdtempSync,
+  rmSync,
+} from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
 import { createInterface, type Interface as ReadlineInterface } from "node:readline";
 
 import type { ModelOption } from "../../shared/types.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 const COMMAND = "codex";
+const APP_SERVER_ARGS = ["app-server", "--stdio"] as const;
 const REQUEST_TIMEOUT_MS = 15_000;
 const RUN_TIMEOUT_MS = 120_000;
+const MAX_DIAGNOSTIC_BYTES = 8_192;
+const CODEX_OVERLAY_FILES = [
+  "auth.json",
+  "config.toml",
+  "installation_id",
+  "models_cache.json",
+  "version.json",
+] as const;
 
 type RpcId = number | string;
 type JsonObject = Record<string, unknown>;
@@ -30,6 +49,78 @@ interface InspectionResult {
 }
 
 const reasoningEffortByModel = new Map<string, string>();
+let temporaryCodexHome: string | undefined;
+
+export interface CodexEnvironmentOptions {
+  canWrite?: (path: string) => boolean;
+  createOverlayHome?: (sourceHome: string) => string;
+  homeDirectory?: string;
+}
+
+function canWriteDirectory(path: string): boolean {
+  try {
+    accessSync(path, constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function createTemporaryCodexHome(sourceHome: string): string {
+  if (temporaryCodexHome) return temporaryCodexHome;
+  temporaryCodexHome = mkdtempSync(join(tmpdir(), "tps-racer-codex-"));
+  chmodSync(temporaryCodexHome, 0o700);
+  for (const name of CODEX_OVERLAY_FILES) {
+    try {
+      const destination = join(temporaryCodexHome, name);
+      copyFileSync(join(sourceHome, name), destination);
+      chmodSync(destination, 0o600);
+    } catch (error) {
+      if (!isObject(error) || error.code !== "ENOENT") throw error;
+    }
+  }
+  process.once("exit", () => {
+    if (temporaryCodexHome) rmSync(temporaryCodexHome, { recursive: true, force: true });
+  });
+  return temporaryCodexHome;
+}
+
+export function codexAppServerEnvironment(
+  environment: NodeJS.ProcessEnv = process.env,
+  options: CodexEnvironmentOptions = {},
+): NodeJS.ProcessEnv {
+  const codexHome = environment.CODEX_HOME?.trim()
+    || join(options.homeDirectory ?? homedir(), ".codex");
+  if ((options.canWrite ?? canWriteDirectory)(codexHome)) return environment;
+
+  const overlayHome = (options.createOverlayHome ?? createTemporaryCodexHome)(codexHome);
+
+  return {
+    ...environment,
+    CODEX_HOME: overlayHome,
+    CODEX_SQLITE_HOME: environment.CODEX_SQLITE_HOME?.trim() || overlayHome,
+  };
+}
+
+export function codexAppServerDiagnostic(stderr: string, homeDirectory = homedir()): string | undefined {
+  const withoutAnsi = stderr
+    .replace(/\u001b\[[0-?]*[ -\/]*[@-~]/g, "")
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
+    .split(homeDirectory).join("~")
+    .replace(
+      /\b(authorization|api[_ -]?key|access[_ -]?token)\b["']?\s*[:=]\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|(?:Bearer\s+)?[^\s,;}\]]+)/gi,
+      "$1=[redacted]",
+    )
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/gi, "Bearer [redacted]")
+    .replace(/\b(?:Bearer\s+)?(?:sk|sess)-[A-Za-z0-9._-]{12,}\b/gi, "[redacted]");
+  const lines = withoutAnsi
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !line.includes("could not create PATH aliases"));
+  if (lines.length === 0) return undefined;
+  return lines.slice(-4).join(" ").slice(0, 600);
+}
 
 export function codexTurnStartParams(
   threadId: string,
@@ -123,26 +214,31 @@ class CodexRpcClient {
   private nextId = 1;
   private closed = false;
   private terminationError: Error | undefined;
+  private stderr = "";
 
   private constructor(private readonly child: ChildProcessWithoutNullStreams) {
     this.lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
     this.lines.on("line", (line) => this.handleLine(line));
-    // Drain stderr without forwarding it: app-server diagnostics can contain local paths or auth
-    // details and are not safe to surface in browser-facing benchmark errors.
-    child.stderr.resume();
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      this.stderr = `${this.stderr}${chunk}`.slice(-MAX_DIAGNOSTIC_BYTES);
+    });
     child.stdin.on("error", (error) => this.terminate(error));
     child.once("error", (error) => this.terminate(error));
-    child.once("exit", (code, signal) => {
+    child.once("close", (code, signal) => {
       if (this.closed) return;
       const detail = code === null ? `signal ${signal ?? "unknown"}` : `code ${code}`;
-      this.terminate(new Error(`Codex app-server exited with ${detail}`));
+      const diagnostic = codexAppServerDiagnostic(this.stderr);
+      this.terminate(new Error(
+        `Codex app-server exited with ${detail}${diagnostic ? `: ${diagnostic}` : ""}`,
+      ));
     });
   }
 
   static async start(cwd: string): Promise<CodexRpcClient> {
-    const child = spawn(COMMAND, ["app-server"], {
+    const child = spawn(COMMAND, APP_SERVER_ARGS, {
       cwd,
-      env: process.env,
+      env: codexAppServerEnvironment(),
       stdio: ["pipe", "pipe", "pipe"],
     });
     const client = new CodexRpcClient(child);

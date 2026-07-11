@@ -242,15 +242,7 @@ describe("terminal event rendering", () => {
     const render = createTerminalEventRenderer(writer, [competitor]);
 
     render({ type: "benchmark.started", benchmarkId: "first", totalRuns: 1 });
-    render({
-      type: "run.status",
-      competitorId: "a",
-      workload: "prose",
-      sample: 1,
-      warmup: true,
-      status: "running",
-    });
-    render({ type: "run.error", competitorId: "a", workload: "prose", sample: 1, message: "failed" });
+    render({ type: "run.error", competitorId: "a", workload: "prose", sample: 1, warmup: true, message: "failed" });
     render({ type: "benchmark.started", benchmarkId: "second", totalRuns: 1 });
     render({ type: "run.complete", result: result("a") });
 

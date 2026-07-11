@@ -13,15 +13,15 @@ The dashboard opens at `http://127.0.0.1:4317`. It shows only harnesses detected
 
 ## Run in the terminal
 
-Pass `--cli` to run the same benchmark without starting a local web server or opening a browser:
+Pass `--cli` to run the same benchmark without starting a local web server or opening a browser. The native terminal workbench uses [Bun](https://bun.sh/), so install Bun and make sure it is on your PATH first:
 
 ```bash
 pnpm benchmark -- --cli
 ```
 
-On an interactive terminal, this opens a full-screen keyboard-driven UI with an editable starting grid, searchable model picker, tmux-style live output panes for every racer, and a detailed final classification with winner gaps, per-workload timing, validity, and failure diagnostics. Use the arrow keys to move, `Space` to choose models, `A`/`D` to add or remove lanes, `M`/`P` to change race settings, and `Enter` to start.
+On an interactive terminal, this opens a full-screen OpenTUI workbench with a persistent racer roster, tmux-style live output panes, and an in-place leaderboard with timing, validity, and failure diagnostics. Use the mouse or arrow keys to navigate, `Space` to select racers, `Enter` to start, `S` to open the roster, and `Ctrl-P` for the command palette.
 
-Piped or non-interactive environments retain a plain-text fallback. Both interfaces use the same benchmark engine and report median prompt-to-first-output, cold-start-to-first-output, visible-token speed, and prompt-to-finish ranking just like the browser dashboard.
+The Node browser launcher remains unchanged; only `--cli` is re-launched through Bun for OpenTUI's native renderer. Programmatic callers can still select the plain-text terminal mode. Both interfaces use the same benchmark engine and report median prompt-to-first-output, cold-start-to-first-output, visible-token speed, and prompt-to-finish ranking just like the browser dashboard.
 
 Once published, the equivalent zero-install command is:
 
@@ -72,6 +72,7 @@ The prose payload is the abstract of [“Attention Is All You Need”](https://a
 ```bash
 pnpm typecheck
 pnpm test
+pnpm test:tui
 pnpm build
 pnpm start -- --no-open
 pnpm start -- --cli
