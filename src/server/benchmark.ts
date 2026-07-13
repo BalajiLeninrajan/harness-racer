@@ -41,7 +41,7 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
   const abort = () => controller.abort(parentSignal.reason);
   parentSignal.addEventListener("abort", abort, { once: true });
 
-  const workspace = await mkdtemp(join(tmpdir(), "tps-racer-"));
+  const workspace = await mkdtemp(join(tmpdir(), "harness-racer-"));
   const launchedAt = performance.now();
   let readyAt = launchedAt;
   let startedAt = launchedAt;

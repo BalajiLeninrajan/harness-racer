@@ -153,8 +153,8 @@ export function App() {
   const [providersLoading, setProvidersLoading] = useState(true);
   const [providersError, setProvidersError] = useState<string>();
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
-  const [mode, setMode] = useState<RunMode>(() => (localStorage.getItem("tps-racer.mode") as RunMode) || "parallel");
-  const [preset, setPreset] = useState<SamplePreset>(() => (localStorage.getItem("tps-racer.preset") as SamplePreset) || "standard");
+  const [mode, setMode] = useState<RunMode>(() => (localStorage.getItem("harness-racer.mode") as RunMode) || "parallel");
+  const [preset, setPreset] = useState<SamplePreset>(() => (localStorage.getItem("harness-racer.preset") as SamplePreset) || "standard");
   const [page, setPage] = useState<Page>("benchmark");
   const [phase, setPhase] = useState<Phase>("setup");
   const [socketState, setSocketState] = useState<SocketState>("connecting");
@@ -191,8 +191,8 @@ export function App() {
   }, [loadProviders]);
 
   useEffect(() => {
-    localStorage.setItem("tps-racer.mode", mode);
-    localStorage.setItem("tps-racer.preset", preset);
+    localStorage.setItem("harness-racer.mode", mode);
+    localStorage.setItem("harness-racer.preset", preset);
   }, [mode, preset]);
 
   useEffect(() => {
@@ -446,9 +446,9 @@ export function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <button className="brand" disabled={phase === "running"} onClick={() => { setPage("benchmark"); setPhase("setup"); }} aria-label="TPS Racer home">
+        <button className="brand" disabled={phase === "running"} onClick={() => { setPage("benchmark"); setPhase("setup"); }} aria-label="Harness Racer home">
           <span className="brand-icon"><Gauge size={19} /></span>
-          <span><b>tps</b>.racer</span>
+          <span><b>harness</b>.racer</span>
         </button>
         <div className={page === "about" ? "page-context" : "phase-track"} aria-label={page === "about" ? "Current page" : "Benchmark progress"}>
           {page === "about" ? <><Info size={13} /> Methodology</> : <>
@@ -717,7 +717,7 @@ export function App() {
       </main>
 
       <footer>
-        <div className="footer-brand"><Gauge size={16} /><strong><b>tps</b>.racer</strong><span>Model speed benchmark</span></div>
+        <div className="footer-brand"><Gauge size={16} /><strong><b>harness</b>.racer</strong><span>Model speed benchmark</span></div>
         <span className="footer-note">Made with 💜 in Waterloo</span>
       </footer>
     </div>

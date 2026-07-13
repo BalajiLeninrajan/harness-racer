@@ -337,7 +337,7 @@ class CodexRpcClient {
 
 async function initialize(client: CodexRpcClient): Promise<string | undefined> {
   const response = await client.request<JsonObject>("initialize", {
-    clientInfo: { name: "tps_racer", title: "TPS Racer", version: "0.1.0" },
+    clientInfo: { name: "harness_racer", title: "Harness Racer", version: "0.1.0" },
     capabilities: { experimentalApi: true },
   });
   await client.notify("initialized");

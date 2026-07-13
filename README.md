@@ -1,6 +1,6 @@
-# TPS Racer
+# Harness Racer
 
-Race the coding-agent stacks already authenticated on your machine. TPS Racer opens a local browser dashboard, streams every response live, and compares harness preparation, prompt-to-first-output, cold-start responsiveness, visible tokens per second, and prompt-to-finish time.
+Race the coding-agent stacks already authenticated on your machine. Harness Racer opens a local browser dashboard, streams every response live, and compares harness preparation, prompt-to-first-output, cold-start responsiveness, visible tokens per second, and prompt-to-finish time.
 
 ## Run locally
 
@@ -16,7 +16,7 @@ The dashboard opens at `http://127.0.0.1:4317`. It shows only harnesses detected
 The package is designed for zero-install use after publication:
 
 ```bash
-npx tps-racer@latest
+npx harness-racer@latest
 ```
 
 A normal hosted website cannot directly start local coding-agent CLIs or reuse their local subscription credentials. The `npx` package is the local companion: it binds only to loopback, launches the agents on the same machine, and serves the browser UI. A hosted landing page can document the tool, but the benchmark itself must run locally unless users install a separate daemon.
@@ -33,10 +33,10 @@ Each run uses an empty temporary directory and asks the agent to reproduce fixed
 
 ## Methodology
 
-TPS Racer intentionally measures the complete local experience: harness, model, provider route, network conditions, account configuration, and the local machine. It is not a raw model API benchmark or a model-quality evaluation.
+Harness Racer intentionally measures the complete local experience: harness, model, provider route, network conditions, account configuration, and the local machine. It is not a raw model API benchmark or a model-quality evaluation.
 
 - **Harness prep** is the time an adapter spends launching and preparing its harness before declaring the lane ready.
-- **Prompt → first output** runs from the common start signal until the first visible streamed text reaches TPS Racer.
+- **Prompt → first output** runs from the common start signal until the first visible streamed text reaches Harness Racer.
 - **Cold start → first output** combines harness prep and prompt-to-first-output, excluding time spent waiting at the parallel start barrier.
 - **Visible tokens / sec** uses the shared tokenizer over the first-to-last visible stream window.
 - **Prompt → finish** runs from the common start signal to the final visible output chunk and determines finishing order.

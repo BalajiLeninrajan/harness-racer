@@ -148,7 +148,7 @@ async function startSession(cwd: string, onNotification: (method: string, params
   await connection.request("initialize", {
     protocolVersion: 1,
     clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
-    clientInfo: { name: "tps-racer", version: "0.1.0" },
+    clientInfo: { name: "harness-racer", version: "0.1.0" },
   });
   await connection.request("authenticate", { methodId: process.env.XAI_API_KEY?.trim() ? "xai.api_key" : "cached_token" });
   const session = await connection.request("session/new", { cwd, mcpServers: [] });
