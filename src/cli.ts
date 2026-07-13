@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("Could not determine local server address.");
   const url = `http://127.0.0.1:${address.port}`;
-  console.log(`TPS Racer is ready: ${url}`);
+  console.log(`Harness Racer is ready: ${url}`);
   if (shouldOpen) await open(url);
 
   const shutdown = async () => {

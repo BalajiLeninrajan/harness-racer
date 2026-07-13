@@ -312,7 +312,7 @@ async function discoverCursorModels(): Promise<CursorDiscovery> {
         terminal: false,
         _meta: { parameterizedModelPicker: true },
       },
-      clientInfo: { name: "tps-racer-model-probe", version: "0.1.0" },
+      clientInfo: { name: "harness-racer-model-probe", version: "0.1.0" },
     });
     await connection.request("authenticate", { methodId: "cursor_login" });
     const session = await connection.request("session/new", { cwd: process.cwd(), mcpServers: [] });
@@ -373,7 +373,7 @@ async function runCursor(input: AdapterRunInput): Promise<AdapterRunOutput> {
           terminal: false,
           _meta: { parameterizedModelPicker: true },
         },
-        clientInfo: { name: "tps-racer", version: "0.1.0" },
+        clientInfo: { name: "harness-racer", version: "0.1.0" },
       });
       await connection.request("authenticate", { methodId: "cursor_login" });
       const created = await connection.request("session/new", { cwd: input.cwd, mcpServers: [] });

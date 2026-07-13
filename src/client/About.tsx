@@ -6,7 +6,7 @@ interface AboutProps {
 
 const metrics = [
   ["Harness prep", "Time spent launching and preparing the harness before the lane is ready."],
-  ["Prompt → first output", "Time from the start signal until the first visible text reaches TPS Racer."],
+  ["Prompt → first output", "Time from the start signal until the first visible text reaches Harness Racer."],
   ["Cold start → first output", "Harness prep plus prompt-to-first-output, excluding any wait at the parallel start barrier."],
   ["Visible tokens / sec", "Visible output counted with the same tokenizer for every racer, divided by the visible streaming window."],
   ["Prompt → finish", "Time from the start signal to the final visible chunk. This determines finishing order."],
@@ -20,7 +20,7 @@ export function About({ onBack }: AboutProps) {
       <header className="about-summary">
         <h1>Methodology</h1>
         <p>
-          TPS Racer measures the speed of the local harness and model combination you run. Results can also
+          Harness Racer measures the speed of the local harness and model combination you run. Results can also
           reflect provider routing, network conditions, account configuration, and your machine. This is not
           a model-quality test or a raw model API benchmark.
         </p>

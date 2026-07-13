@@ -122,7 +122,7 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
     const model = parseModelId(input.model);
     const created = await client.session.create({
       directory: input.cwd,
-      title: "TPS Racer benchmark",
+      title: "Harness Racer benchmark",
       model: { id: model.modelID, providerID: model.providerID },
       permission: [{ permission: "*", pattern: "*", action: "deny" }],
     });
