@@ -1,13 +1,8 @@
 import { Box, Text } from "ink";
 import type { Competitor } from "../../shared/types.js";
-import { formatMs, formatRate } from "../format.js";
+import { formatMs, formatProgressBar, formatRate } from "../format.js";
 import { outputTail, raceGridColumns, type TuiLane, type TuiRaceState } from "../model.js";
 import { ACCENT, BLUE, MUTED } from "../theme.js";
-
-function progressBar(done: number, total: number, width: number): string {
-  const filled = total ? Math.round(Math.min(1, done / total) * width) : 0;
-  return `${"━".repeat(filled)}${"─".repeat(Math.max(0, width - filled))}`;
-}
 
 interface RacePaneProps {
   competitor: Competitor;
@@ -79,7 +74,7 @@ export function RunningView({ competitors, race, spinner, columns, rows, cursor,
     <Box flexDirection="column" height={rows} paddingX={1} overflow="hidden" width="100%">
       <Box height={1} justifyContent="space-between">
         <Text bold><Text color={ACCENT}>{spinner} </Text>They’re off.</Text>
-        <Text color={ACCENT}>{progressBar(race.completedRuns, race.totalRuns, barWidth)}</Text>
+        <Text color={ACCENT}>{formatProgressBar(race.completedRuns, race.totalRuns, barWidth)}</Text>
         <Text>{race.completedRuns} / {race.totalRuns || "…"}</Text>
       </Box>
       <Box flexDirection="column" height={gridHeight} rowGap={1} marginTop={1} overflow="hidden">
