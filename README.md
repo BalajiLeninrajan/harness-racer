@@ -11,6 +11,18 @@ pnpm benchmark
 
 The dashboard opens at `http://127.0.0.1:4317`. It shows only harnesses detected on the machine, then lets you pick models and start the race.
 
+## Terminal mode
+
+Run the same benchmark entirely in your terminal:
+
+```bash
+pnpm cli
+```
+
+After the package is published, use `harness-racer --cli` (or `--tui`). The interactive terminal UI discovers locally available harnesses, lets you select 2–6 harness/model pairs, configures parallel or sequential sampling, shows live lane timing and output, and presents the final ranking. The browser dashboard remains the default when no mode flag is given.
+
+Terminal controls are shown at the bottom of each screen. The lineup is an editable list (`a` adds a racer); each entry opens a two-tier harness/model picker. Use `h`/`j`/`k`/`l` (or arrow keys) to navigate and `/` to search models. On the starting grid, Space applies the focused choice and Enter starts the race. Enter confirms a model or zooms a live pane, Escape goes back or cancels a running race, and Ctrl+C exits.
+
 ## Distribution
 
 The package is designed for zero-install use after publication:

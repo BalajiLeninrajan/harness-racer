@@ -1,77 +1,54 @@
-import { createServer } from "node:http";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-import open from "open";
-import sirv from "sirv";
-import { attachWebSockets, handleApi } from "./server/app.js";
+const argv = process.argv.slice(2);
+const args = new Set(argv);
 
-const args = new Set(process.argv.slice(2));
-const isDev = args.has("--dev");
-const shouldOpen = !args.has("--no-open");
-const portArg = process.argv.findIndex((arg) => arg === "--port");
-const requestedPort = portArg >= 0 ? Number(process.argv[portArg + 1]) : 4317;
+function valueAfter(flag: string): string | undefined {
+  const index = argv.indexOf(flag);
+  return index >= 0 ? argv[index + 1] : undefined;
+}
+
+function printHelp(): void {
+  console.log(`harness-racer — race local coding-agent stacks
+
+Usage:
+  harness-racer                 Open the browser dashboard
+  harness-racer --cli           Run the interactive terminal UI
+
+Options:
+  --cli, --tui              Use terminal mode
+  --web                     Use the browser dashboard (default)
+  --port <number>           Browser server port (default: 4317)
+  --no-open                 Do not open the browser automatically
+  --dev                     Use Vite middleware for browser development
+  -h, --help                Show this help`);
+}
 
 async function main(): Promise<void> {
-  let viteMiddleware: ((req: Parameters<typeof handleApi>[0], res: Parameters<typeof handleApi>[1]) => void) | undefined;
-  let closeVite: (() => Promise<void>) | undefined;
-
-  if (isDev) {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    viteMiddleware = vite.middlewares;
-    closeVite = () => vite.close();
+  if (args.has("--help") || args.has("-h")) {
+    printHelp();
+    return;
   }
 
-  const currentDir = dirname(fileURLToPath(import.meta.url));
-  const staticDir = resolve(currentDir, "client");
-  const staticHandler = sirv(staticDir, { single: true, dev: false });
-
-  const server = createServer((req, res) => {
-    void handleApi(req, res).then((handled) => {
-      if (handled) return;
-      if (viteMiddleware) viteMiddleware(req, res);
-      else staticHandler(req, res);
-    });
-  });
-  const webSockets = attachWebSockets(server);
-
-  const listen = (port: number) =>
-    new Promise<void>((resolveListen, reject) => {
-      const onError = (error: Error) => reject(error);
-      server.once("error", onError);
-      server.listen(port, "127.0.0.1", () => {
-        server.removeListener("error", onError);
-        resolveListen();
-      });
-    });
-
-  try {
-    await listen(requestedPort);
-  } catch (error) {
-    if (requestedPort === 0 || !(error instanceof Error) || !("code" in error) || error.code !== "EADDRINUSE") {
-      throw error;
+  if (args.has("--cli") || args.has("--tui")) {
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      throw new Error("CLI mode needs an interactive terminal. Run it directly with `harness-racer --cli`.");
     }
-    console.warn(`Port ${requestedPort} is busy; using an available local port instead.`);
-    await listen(0);
+    const { runTui } = await import("./tui/app.js");
+    await runTui();
+    return;
   }
 
-  const address = server.address();
-  if (!address || typeof address === "string") throw new Error("Could not determine local server address.");
-  const url = `http://127.0.0.1:${address.port}`;
-  console.log(`Harness Racer is ready: ${url}`);
-  if (shouldOpen) await open(url);
+  const portValue = valueAfter("--port");
+  const port = portValue === undefined ? 4317 : Number(portValue);
+  if (!Number.isInteger(port) || port < 0 || port > 65_535) {
+    throw new Error(`Invalid port: ${portValue ?? ""}`);
+  }
 
-  const shutdown = async () => {
-    webSockets.clients.forEach((client) => client.close());
-    webSockets.close();
-    await closeVite?.();
-    server.close(() => process.exit(0));
-  };
-  process.once("SIGINT", () => void shutdown());
-  process.once("SIGTERM", () => void shutdown());
+  const { runWeb } = await import("./web.js");
+  await runWeb({
+    dev: args.has("--dev"),
+    open: !args.has("--no-open"),
+    port,
+  });
 }
 
 main().catch((error) => {
