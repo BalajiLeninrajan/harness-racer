@@ -2,8 +2,8 @@ import React from "react";
 import { renderToString } from "ink";
 import { describe, expect, it } from "vitest";
 import type { Competitor, ProviderInfo } from "../src/shared/types.js";
-import { ConfigureView, LineupView, PickerView, ResultsView, RunningView } from "../src/tui/app.js";
 import { emptyRaceState, filterRacerOptions, racerOptions, type TuiRaceState } from "../src/tui/model.js";
+import { ConfigureView, LineupView, PickerView, ResultsView, RunningView } from "../src/tui/views/index.js";
 
 const stripAnsi = (value: string) => value.replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, "");
 const renderedLineCount = (value: string) => stripAnsi(value).trim().split("\n").length;

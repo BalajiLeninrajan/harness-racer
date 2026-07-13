@@ -8,8 +8,10 @@ import type {
   SummaryRow,
   WorkloadId,
 } from "../shared/types.js";
+import { MAX_RACERS, SAMPLE_PRESETS } from "./constants.js";
+import { TUI_COLORS } from "./theme.js";
 
-export const TUI_COLORS = ["#cba6f7", "#94e2d5", "#f9e2af", "#89b4fa", "#fab387", "#f5c2e7"];
+export { TUI_COLORS } from "./theme.js";
 
 export interface RacerOption {
   key: string;
@@ -55,7 +57,7 @@ export function configureActivation(cursor: number, trigger: "enter" | "space"):
   if (cursor === 0) return { type: "mode", value: "parallel" };
   if (cursor === 1) return { type: "mode", value: "sequential" };
   if (cursor >= 2 && cursor <= 4) {
-    return { type: "preset", value: (["quick", "standard", "thorough"] as SamplePreset[])[cursor - 2] };
+    return { type: "preset", value: SAMPLE_PRESETS[cursor - 2] };
   }
   return undefined;
 }
@@ -99,7 +101,7 @@ export function competitorsFromSelection(options: RacerOption[], selection: read
   return selection
     .map((key) => optionsByKey.get(key))
     .filter((option): option is RacerOption => option !== undefined)
-    .slice(0, 6)
+    .slice(0, MAX_RACERS)
     .map((option, index) => ({
       id: `tui-${index}-${option.provider.id}-${option.model.id}`,
       harness: option.provider.id,
