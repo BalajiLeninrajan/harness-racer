@@ -1,15 +1,9 @@
 # Harness Racer
 
+> [!WARNING]
+> Harness Racer is a very early work in progress. It is under active development, incomplete, and not yet ready for general use.
+
 Race the coding-agent stacks already authenticated on your machine. Harness Racer opens a local browser dashboard, streams every response live, and compares harness preparation, prompt-to-first-output, cold-start responsiveness, visible tokens per second, and prompt-to-finish time.
-
-## Run locally
-
-```bash
-pnpm install
-pnpm benchmark
-```
-
-The dashboard opens at `http://127.0.0.1:4317`. It shows only harnesses detected on the machine, then lets you pick models and start the race.
 
 ## Terminal mode
 
@@ -22,16 +16,6 @@ pnpm cli
 After the package is published, use `harness-racer --cli` (or `--tui`). The interactive terminal UI discovers locally available harnesses, lets you select 2–6 harness/model pairs, configures parallel or sequential sampling, shows live lane timing and output, and presents the final ranking. The browser dashboard remains the default when no mode flag is given.
 
 Terminal controls are shown at the bottom of each screen. The lineup is an editable list (`a` adds a racer); each entry opens a two-tier harness/model picker. Use `h`/`j`/`k`/`l` (or arrow keys) to navigate and `/` to search models. On the starting grid, Space applies the focused choice and Enter starts the race. Enter confirms a model or zooms a live pane, Escape goes back or cancels a running race, and Ctrl+C exits.
-
-## Distribution
-
-The package is designed for zero-install use after publication:
-
-```bash
-npx harness-racer@latest
-```
-
-A normal hosted website cannot directly start local coding-agent CLIs or reuse their local subscription credentials. The `npx` package is the local companion: it binds only to loopback, launches the agents on the same machine, and serves the browser UI. A hosted landing page can document the tool, but the benchmark itself must run locally unless users install a separate daemon.
 
 ## Supported harnesses
 
