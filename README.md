@@ -5,11 +5,6 @@
 [![Node.js](https://img.shields.io/node/v/harness-racer.svg)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/BalajiLeninrajan/harness-racer/blob/main/LICENSE)
 
-Source: [github.com/BalajiLeninrajan/harness-racer](https://github.com/BalajiLeninrajan/harness-racer)
-
-> [!WARNING]
-> Harness Racer is a very early work in progress. It is under active development, incomplete, and not yet ready for general use.
-
 Race the coding-agent stacks already installed and authenticated on your machine. Harness Racer streams every response live and compares cold-start responsiveness, time to first output, visible tokens per second, and time to finish — in a browser dashboard or entirely in your terminal.
 
 It measures the experience a harness actually gives you locally. It is not a raw model API benchmark and not a model-quality evaluation. It never asks for API keys.
@@ -76,16 +71,3 @@ pnpm run ci          # typecheck, test, build — the same gate CI enforces
 pnpm cli             # terminal mode from source
 pnpm dev             # dashboard with Vite middleware
 ```
-
-## Releasing
-
-Pushing a `v*` tag runs [`release.yml`](https://github.com/BalajiLeninrajan/harness-racer/blob/main/.github/workflows/release.yml), which verifies the tag matches `package.json`, runs the `ci` gate, and publishes to npm with provenance.
-
-```console
-npm version patch
-git push --follow-tags
-```
-
-## License
-
-MIT — see [LICENSE](https://github.com/BalajiLeninrajan/harness-racer/blob/main/LICENSE).
