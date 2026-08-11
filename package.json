@@ -2,6 +2,14 @@
   "name": "harness-racer",
   "version": "0.1.0",
   "description": "Race local coding-agent harness and model stacks by visible responsiveness and streaming speed.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BalajiLeninrajan/harness-racer.git"
+  },
+  "homepage": "https://github.com/BalajiLeninrajan/harness-racer#readme",
+  "bugs": {
+    "url": "https://github.com/BalajiLeninrajan/harness-racer/issues"
+  },
   "type": "module",
   "bin": {
     "harness-racer": "dist/cli.js"
@@ -22,7 +30,8 @@
     "ci": "pnpm typecheck && pnpm test && pnpm build",
     "start": "node dist/cli.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run ci"
   },
   "keywords": [
     "codex",
@@ -60,5 +69,8 @@
     "vite": "^8.0.0",
     "vitest": "^4.0.18"
   },
-  "packageManager": "pnpm@11.7.0"
+  "packageManager": "pnpm@11.7.0",
+  "publishConfig": {
+    "access": "public"
+  }
 }
