@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Harness Racer — race your local coding agents</title>
+<meta name="description" content="Race the coding-agent stacks already installed on your machine. Cold start, first output, visible tokens per second — streamed live." />
+<meta name="theme-color" content="#11111b" />
+<meta property="og:title" content="Harness Racer" />
+<meta property="og:description" content="Race the coding-agent stacks already installed on your machine." />
+<meta property="og:type" content="website" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..850&family=JetBrains+Mono:wght@500;650;800&display=swap" />
+<link rel="stylesheet" href="/tokens.css" />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<div class="app-shell">
+
+  <header class="topbar">
+    <a class="brand" href="/">
+      <span class="brand-icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+      </span>
+      <strong><b>harness</b>.racer</strong>
+    </a>
+    <nav class="topbar-actions">
+      <a class="ghost-link" href="https://www.npmjs.com/package/harness-racer">npm</a>
+      <a class="ghost-link" href="https://github.com/BalajiLeninrajan/harness-racer">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="eyebrow"><span class="live-dot"></span> LOCAL HARNESS BENCHMARK</div>
+      <h1>Race the agents<br />already on your <em>machine</em>.</h1>
+      <p>Cold start, time to first output, visible tokens per second — streamed live, side by side. No API keys.</p>
+
+      <button class="command" type="button" data-copy="npx harness-racer">
+        <code><span class="prompt">$</span> npx harness-racer</code>
+        <span class="copy-hint" data-copy-label>COPY</span>
+      </button>
+
+      <div class="hero-stats">
+        <span>Codex</span><span>Claude Code</span><span>Cursor</span><span>Grok</span><span>OpenCode</span>
+      </div>
+    </section>
+
+    <section class="race-view" id="race" aria-label="Simulated race preview">
+      <div class="race-header">
+        <div>
+          <div class="eyebrow"><span class="live-dot"></span> LIVE TIMING <i class="sim-tag">SIMULATED</i></div>
+          <h2>They&rsquo;re off.</h2>
+        </div>
+        <div class="race-header-right">
+          <div class="heat-switcher" data-heats>
+            <span data-heat="prose"><span>01</span> Attention paper</span>
+            <i></i>
+            <span data-heat="code"><span>02</span> nanoGPT attention</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="overall-progress">
+        <div><span data-progress-label>0 / 8 runs complete</span><span data-progress-percent>0%</span></div>
+        <div class="progress-track"><span data-progress-bar style="width:2%"></span></div>
+      </div>
+
+      <div class="race-lanes" data-lanes></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-brand"><strong><b>harness</b>.racer</strong><span>MIT licensed</span></div>
+    <span class="footer-note">Made with 💜 in Waterloo</span>
+  </footer>
+
+</div>
+<script src="/race.js" type="module"></script>
+</body>
+</html>

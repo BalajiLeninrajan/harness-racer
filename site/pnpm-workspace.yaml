@@ -1,0 +1,7 @@
+# Keeps the landing page's install separate from the CLI package at the repo root.
+packages:
+  - "."
+
+allowBuilds:
+  esbuild: true
+  workerd: true
