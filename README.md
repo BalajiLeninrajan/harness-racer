@@ -1,4 +1,4 @@
-# Harness Racer
+# harness racer
 
 [![CI](https://github.com/BalajiLeninrajan/harness-racer/actions/workflows/ci.yml/badge.svg)](https://github.com/BalajiLeninrajan/harness-racer/actions/workflows/ci.yml)
 [![harness-racer on npm](https://img.shields.io/npm/v/harness-racer.svg?label=harness-racer)](https://www.npmjs.com/package/harness-racer)
