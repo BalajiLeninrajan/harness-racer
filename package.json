@@ -1,6 +1,6 @@
 {
   "name": "harness-racer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Race local coding-agent harness and model stacks by visible responsiveness and streaming speed.",
   "repository": {
     "type": "git",
