@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-import "catppuccin-neu/css/index.css";
+import "./vendor/index.css";
 import "./styles.css";
 
 const root = document.getElementById("root");
