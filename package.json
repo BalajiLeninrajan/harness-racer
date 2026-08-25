@@ -31,7 +31,6 @@
     "start": "node dist/cli.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "sync:client": "catppuccin-neu-sync src/client/vendor",
     "prepublishOnly": "pnpm run ci"
   },
   "keywords": [
