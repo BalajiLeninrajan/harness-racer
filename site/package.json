@@ -4,8 +4,8 @@
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "dev": "pnpm sync && wrangler dev",
+    "deploy": "pnpm sync && wrangler deploy",
     "sync": "catppuccin-neu-sync public"
   },
   "devDependencies": {
