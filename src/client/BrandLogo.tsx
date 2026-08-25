@@ -61,7 +61,6 @@ function Logo({ id, size = 18 }: { id: LogoId; size?: number }) {
       src={logo.src}
       width={size}
       height={size}
-      title={logo.label}
       alt={logo.label}
     />
   );

@@ -53,7 +53,7 @@ export function About({ onBack }: AboutProps) {
             <span className="mark-solid">02</span>
             <div><h2>Run order</h2></div>
           </div>
-          <div className="sample-table panel option-definitions">
+          <div className="sample-table panel">
             <div><span>PARALLEL</span><strong>All racers prepare, then start together. This is faster, but they share local resources and network capacity.</strong></div>
             <div><span>SEQUENTIAL</span><strong>Racers run one at a time. This takes longer but reduces contention between racers.</strong></div>
           </div>
@@ -63,7 +63,7 @@ export function About({ onBack }: AboutProps) {
             <span className="mark-solid">03</span>
             <div><h2>Samples</h2></div>
           </div>
-          <div className="sample-table panel option-definitions">
+          <div className="sample-table panel">
             <div><span>QUICK</span><strong>No warmup, then 1 measured run for each text (2 measured runs total per racer).</strong></div>
             <div><span>STANDARD</span><strong>1 warmup and 3 measured runs for each text (2 warmups and 6 measured runs total).</strong></div>
             <div><span>THOROUGH</span><strong>1 warmup and 5 measured runs for each text (2 warmups and 10 measured runs total).</strong></div>

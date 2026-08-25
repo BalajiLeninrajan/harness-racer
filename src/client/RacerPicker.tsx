@@ -178,7 +178,6 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
                   className={provider.id === activeHarness ? "active" : ""}
                   aria-pressed={provider.id === activeHarness}
                   aria-label={provider.name}
-                  data-tip={provider.name}
                   key={provider.id}
                   onClick={() => {
                     setActiveHarness(provider.id);
@@ -209,7 +208,7 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
                 aria-expanded="true"
                 aria-activedescendant={filtered[highlighted] ? `${listboxId}-${highlighted}` : undefined}
               />
-              <button type="button" className="btn-icon racer-picker-close" aria-label="Close model picker" onClick={closeAndFocus}><X size={16} /></button>
+              <button type="button" className="btn-icon" aria-label="Close model picker" onClick={closeAndFocus}><X size={16} /></button>
             </div>
             <div className="racer-picker-options" id={listboxId} role="listbox" aria-label={`${activeProvider?.name ?? "Harness"} models`}>
               <div className="racer-picker-pane-label" role="presentation" aria-hidden="true">

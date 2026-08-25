@@ -35,7 +35,7 @@ main { width: min(1240px, calc(100% - 40px)); min-width: 0; margin: 0 auto; posi
   display: grid; place-items: center;
   color: var(--crust);
   background: var(--mauve);
-  border-radius: 10px 10px 10px 3px;
+  border-radius: 10px 10px 10px 4px;
   box-shadow: var(--hard-offset) var(--hard-offset) 0 color-mix(in srgb, var(--mauve) 25%, var(--surface-0));
 }
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
@@ -196,8 +196,8 @@ main { width: min(1240px, calc(100% - 40px)); min-width: 0; margin: 0 auto; posi
   display: flex; align-items: center; justify-content: space-between;
   color: var(--overlay-1);
   border-bottom: 1px solid color-mix(in srgb, var(--surface-2) 32%, transparent);
-  font: 650 10px var(--sans);
-  letter-spacing: .06em;
+  font: 700 10px var(--sans);
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
 .stream-toolbar span { display: flex; align-items: center; gap: 6px; }
@@ -215,6 +215,9 @@ main { width: min(1240px, calc(100% - 40px)); min-width: 0; margin: 0 auto; posi
 .footer-brand b { color: var(--mauve); }
 .footer-note { font: 550 12px/1 var(--sans); }
 
+/* Deliberate app-layer keyframe beyond the package's four: a brightness pulse
+   for the running lane stripe (the package's opacity `pulse` would fade the
+   accent fill instead of glowing it). */
 @keyframes lanePulse { 50% { filter: brightness(1.35); } }
 
 /* ── Desktop: split the viewport, copy beside the race, no page scroll ────── */

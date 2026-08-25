@@ -32,7 +32,7 @@ export function SetupPage({
 }: SetupPageProps) {
   return (
     <section className="setup-view page-enter">
-      <div className="setup-workbench panel is-shell">
+      <div className="panel is-shell">
         <header className="setup-intro">
           <div>
             <div className="eyebrow"><Flag size={14} /> STARTING LINEUP</div>
@@ -45,7 +45,7 @@ export function SetupPage({
           {providersLoading ? (
             <div className="empty-state"><LoaderCircle className="spin" /><strong>Scanning local agents…</strong><span>Checking installed harnesses and models</span></div>
           ) : providersError ? (
-            <div className="empty-state error-state"><AlertCircle /><strong>Agent scan failed</strong><span>{providersError}</span><button className="btn-text" onClick={onRetryProviders}>Try again</button></div>
+            <div className="empty-state"><AlertCircle /><strong>Agent scan failed</strong><span>{providersError}</span><button className="btn-text" onClick={onRetryProviders}>Try again</button></div>
           ) : (
             <div className="competitor-list">
               {competitors.map((competitor) => (

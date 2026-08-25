@@ -2,9 +2,11 @@
   "name": "harness-racer-site",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.7.0",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "sync": "catppuccin-neu-sync public"
   },
   "devDependencies": {
     "catppuccin-neu": "github:BalajiLeninrajan/catppuccin-neu#v0.1.1",

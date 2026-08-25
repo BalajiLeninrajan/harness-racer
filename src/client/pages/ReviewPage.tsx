@@ -24,7 +24,7 @@ export function ReviewPage({ competitors, providers, mode, preset, notice, canSt
   const providerMap = new Map(providers.map((provider) => [provider.id, provider]));
 
   return (
-    <section className="review-view narrow-view page-enter">
+    <section className="narrow-view page-enter">
       <button className="btn btn-secondary back-button" onClick={onEditModels}><ArrowLeft size={16} /> Edit models</button>
       <div className="section-intro">
         <div>
@@ -45,7 +45,7 @@ export function ReviewPage({ competitors, providers, mode, preset, notice, canSt
           </div>
           <div className="option-group">
             <label className="option-label">Samples</label>
-            <div className="segmented preset-grid">
+            <div className="segmented">
               {PRESETS.map((option) => (
                 <button key={option.id} aria-pressed={preset === option.id} className={preset === option.id ? "active" : ""} onClick={() => onPresetChange(option.id)}>
                   <span className="radio-mark">{preset === option.id && <span />}</span>
@@ -58,7 +58,7 @@ export function ReviewPage({ competitors, providers, mode, preset, notice, canSt
         <div className="review-racers">
           {competitors.map((competitor, index) => (
             <div key={competitor.id} className="review-racer cn-spine" style={{ "--accent": competitor.color } as CSSProperties}>
-              <span className="mark-solid review-number">{index + 1}</span>
+              <span className="mark-solid">{index + 1}</span>
               <ModelMark harness={competitor.harness} model={competitor.model} />
               <div className="review-racer-model"><strong>{providerMap.get(competitor.harness)?.models.find((model) => model.id === competitor.model)?.label ?? competitor.model}</strong><span>{modelLabName(competitor.model, competitor.harness)} · via {HARNESS_LABELS[competitor.harness]}</span></div>
               <label className="review-name"><span>Race name</span><input className="input" value={competitor.label} maxLength={32} onChange={(event) => onCompetitorNameChange(competitor.id, event.target.value)} placeholder="Name this racer" /></label>

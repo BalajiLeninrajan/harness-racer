@@ -17,7 +17,7 @@ main { width: min(1440px, calc(100% - 40px)); min-width: 0; margin: 0 auto; posi
 .brand { justify-self: start; display: flex; align-items: center; gap: 9px; padding: 0; border: 0; background: transparent; font-size: 15px; font-weight: 750; letter-spacing: -.02em; cursor: pointer; }
 .brand:disabled { opacity: 1; cursor: default; }
 .brand b { color: var(--mauve); }
-.brand-icon { width: 34px; height: 34px; display: grid; place-items: center; color: var(--crust); border: 1px solid color-mix(in srgb, currentColor 14%, transparent); border-radius: 10px 10px 10px 3px; background: var(--mauve); box-shadow: var(--shadow-mark); }
+.brand-icon { width: 34px; height: 34px; display: grid; place-items: center; color: var(--crust); border: 1px solid color-mix(in srgb, currentColor 14%, transparent); border-radius: 10px 10px 10px 4px; background: var(--mauve); box-shadow: var(--shadow-mark); }
 .phase-track i { font-style: normal; font-variant-numeric: tabular-nums; }
 .connection { justify-self: end; display: flex; align-items: center; gap: 7px; padding: 7px 2px; border: 0; border-radius: 999px; color: var(--overlay-1); background: transparent; font: 650 12px/1 var(--sans); }
 .connection-open { color: var(--green); }
@@ -38,6 +38,9 @@ main { width: min(1440px, calc(100% - 40px)); min-width: 0; margin: 0 auto; posi
 .brand-logo { display: block; flex: 0 0 auto; object-fit: contain; filter: invert(92%) sepia(8%) saturate(558%) hue-rotate(191deg) brightness(99%) contrast(93%); opacity: .92; }
 
 .spin { animation: spin 1s linear infinite; }
+/* Deliberate app-layer keyframe beyond the package's four: a brightness pulse
+   for the running lane stripe (the package's opacity `pulse` would fade the
+   accent fill instead of glowing it). */
 @keyframes lanePulse { 50% { filter: brightness(1.35); } }
 
 /* ── Setup ──────────────────────────────────────────────────────────────── */
@@ -101,7 +104,7 @@ main { width: min(1440px, calc(100% - 40px)); min-width: 0; margin: 0 auto; posi
 .racer-picker-option strong, .racer-picker-option small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .racer-picker-option strong { font-size: 13px; }
 .racer-picker-option small { color: var(--overlay-2); font: 500 12px/1 var(--mono); }
-.racer-picker-option em { padding: 4px 5px; color: var(--yellow); border: 1px solid color-mix(in srgb, var(--yellow) 32%, var(--surface-0)); border-radius: 4px; font: 700 10px/1 var(--sans); font-style: normal; letter-spacing: .04em; }
+.racer-picker-option em { padding: 4px 5px; color: var(--yellow); border: 1px solid color-mix(in srgb, var(--yellow) 32%, var(--surface-0)); border-radius: 4px; font: 700 10px/1 var(--sans); font-style: normal; letter-spacing: .08em; text-transform: uppercase; }
 .racer-picker-option > svg { color: transparent; }
 .racer-picker-option > svg.selected { color: var(--green); }
 .racer-picker-empty { min-height: 110px; display: grid; place-items: center; color: var(--overlay-1); font-size: 12px; }
@@ -127,8 +130,9 @@ main { width: min(1440px, calc(100% - 40px)); min-width: 0; margin: 0 auto; posi
 .review-name { display: flex; flex-direction: column; gap: 6px; }
 .review-name > span { color: var(--overlay-2); font: 700 10px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; }
 .review-name .input { height: 44px; }
-.launch-button { width: min(270px, 100%); justify-self: end; margin: 2px 2px 4px; min-height: 78px; padding: 0 16px; display: flex; align-items: center; gap: 13px; color: var(--text); border: 1px solid color-mix(in srgb, var(--mauve) 30%, transparent); border-radius: 13px; background: var(--base); text-align: left; cursor: pointer; }
-.launch-button:hover:not(:disabled) { background: color-mix(in srgb, var(--mauve) 7%, var(--base)); }
+.launch-button { width: min(270px, 100%); justify-self: end; margin: 2px 2px 4px; min-height: 78px; padding: 0 16px; display: flex; align-items: center; gap: 13px; color: var(--text); border: 1px solid color-mix(in srgb, var(--mauve) 30%, transparent); border-radius: 13px; background: var(--base); box-shadow: var(--hard-offset) var(--hard-offset) 0 var(--hard-offset-color); text-align: left; cursor: pointer; transition: transform .16s, background .16s, border-color .16s, box-shadow .16s; }
+.launch-button:hover:not(:disabled) { background: color-mix(in srgb, var(--mauve) 7%, var(--base)); transform: translate(-1px, -1px); }
+.launch-button:active:not(:disabled) { transform: translate(calc(var(--hard-offset) / 2), calc(var(--hard-offset) / 2)); box-shadow: calc(var(--hard-offset) / 2) calc(var(--hard-offset) / 2) 0 var(--hard-offset-color); }
 .launch-button:disabled { opacity: .42; cursor: not-allowed; box-shadow: var(--neu-inset-soft); }
 .launch-button > span { width: 42px; height: 42px; display: grid; place-items: center; flex: 0 0 auto; color: var(--crust); border-radius: 50%; background: var(--green); box-shadow: var(--shadow-mark); }
 .launch-button > div { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 5px; }
@@ -183,7 +187,7 @@ main { width: min(1440px, calc(100% - 40px)); min-width: 0; margin: 0 auto; posi
 .lane-metrics .metric:nth-child(3) strong { font-size: 28px; }
 .metric-accent strong { color: var(--accent); }
 .stream-window { height: 270px; margin: 11px; }
-.stream-toolbar { flex: 0 0 36px; padding: 0 11px; display: flex; align-items: center; justify-content: space-between; color: var(--overlay-1); border-bottom: 1px solid color-mix(in srgb, var(--surface-2) 32%, transparent); font: 650 10px var(--sans); letter-spacing: .06em; text-transform: uppercase; }
+.stream-toolbar { flex: 0 0 36px; padding: 0 11px; display: flex; align-items: center; justify-content: space-between; color: var(--overlay-1); border-bottom: 1px solid color-mix(in srgb, var(--surface-2) 32%, transparent); font: 700 10px var(--sans); letter-spacing: .08em; text-transform: uppercase; }
 .stream-toolbar span { display: flex; align-items: center; gap: 6px; }
 .caret.hidden { opacity: 0; animation: none; }
 .lane-error { margin: -2px 11px 10px; display: flex; align-items: center; gap: 6px; color: var(--red); font-size: 12px; }
@@ -227,7 +231,7 @@ main { width: min(1440px, calc(100% - 40px)); min-width: 0; margin: 0 auto; posi
 caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .position-badge { width: 30px; height: 30px; display: grid; place-items: center; color: var(--subtext-0); border: 1px solid var(--surface-1); border-radius: 8px; font-variant-numeric: tabular-nums; }
 .position-1 { color: var(--crust); border-color: color-mix(in srgb, currentColor 14%, transparent); background: var(--yellow); box-shadow: var(--shadow-mark); }
-.position-dsq { width: auto; min-width: 30px; padding: 0 6px; color: var(--crust); border-color: var(--red); background: var(--red); font: 700 10px var(--sans); letter-spacing: .04em; }
+.position-dsq { width: auto; min-width: 30px; padding: 0 6px; color: var(--crust); border-color: var(--red); background: var(--red); font: 700 10px var(--sans); letter-spacing: .08em; text-transform: uppercase; }
 tr.has-anomalies { background: color-mix(in srgb, var(--peach) 4%, transparent); }
 tr.disqualified { background: color-mix(in srgb, var(--red) 4%, transparent); }
 tr.disqualified .table-racer strong, tr.disqualified td { color: var(--subtext-0); }
@@ -240,7 +244,7 @@ tr.disqualified .table-racer strong, tr.disqualified td { color: var(--subtext-0
 .anomaly-chip { width: max-content; --tone: var(--peach); }
 .disqualified .anomaly-chip { --tone: var(--red); }
 td.crowned { color: var(--yellow); }
-.best-chip { margin-left: 6px; padding: 3px 5px; color: var(--crust); border-radius: 4px; background: var(--yellow); font: 700 10px/1 var(--sans); letter-spacing: .04em; text-transform: uppercase; vertical-align: 2px; }
+.best-chip { margin-left: 6px; padding: 3px 5px; color: var(--crust); border-radius: 4px; background: var(--yellow); font: 700 10px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; vertical-align: 2px; }
 .run-count { width: max-content; padding: 4px 7px; color: var(--subtext-1); border-radius: 8px; background: color-mix(in srgb, var(--crust) 38%, var(--mantle)); box-shadow: var(--neu-inset-soft); }
 .invalid-results { margin-top: 12px; }
 .invalid-results summary { min-height: 50px; padding: 0 17px; display: flex; align-items: center; justify-content: space-between; color: var(--peach); font-size: 12px; cursor: pointer; list-style: none; }
