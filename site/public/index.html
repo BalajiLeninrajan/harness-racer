@@ -37,42 +37,66 @@
 
   <main>
     <section class="hero">
-      <div class="eyebrow"><span class="live-dot"></span> LOCAL HARNESS BENCHMARK</div>
-      <h1>Race the agents<br />already on your <em>machine</em>.</h1>
-      <p>Cold start, time to first output, visible tokens per second — streamed live, side by side. No API keys.</p>
+      <div class="eyebrow">LOCAL HARNESS BENCHMARK</div>
+      <h1>Race the agents already on your <em>machine</em>.</h1>
 
-      <button class="command" type="button" data-copy="npx harness-racer">
-        <code><span class="prompt">$</span> npx harness-racer</code>
-        <span class="copy-hint" data-copy-label>COPY</span>
-      </button>
-
-      <div class="hero-stats">
+      <div class="hero-harnesses">
         <span class="chip">Codex</span><span class="chip">Claude Code</span><span class="chip">Cursor</span><span class="chip">Grok</span><span class="chip">OpenCode</span>
       </div>
+
+      <div class="command well">
+        <code class="command-text" id="cmd"><span class="command-prompt">$</span> npx harness-racer</code>
+        <button
+          class="btn-icon copy"
+          id="copy"
+          type="button"
+          data-command="npx harness-racer"
+          data-tip="Copy"
+          aria-label="Copy the install command"
+        >
+          <svg
+            class="copy-glyph"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="9" y="9" width="11" height="11" rx="2.5" />
+            <path d="M5 15V5.5A2.5 2.5 0 0 1 7.5 3H15" />
+          </svg>
+          <svg
+            class="done-glyph"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </button>
+      </div>
     </section>
 
-    <section class="race-view" id="race" aria-label="Simulated race preview">
-      <div class="race-header">
-        <div>
-          <div class="eyebrow"><span class="live-dot"></span> LIVE TIMING <i class="sim-tag">SIMULATED</i></div>
-          <h2>They&rsquo;re off.</h2>
-        </div>
-        <div class="race-header-right">
-          <div class="heat-switcher" data-heats>
-            <span data-heat="prose"><span>01</span> Attention paper</span>
-            <i></i>
-            <span data-heat="code"><span>02</span> nanoGPT attention</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="overall-progress">
-        <div><span data-progress-label>0 / 8 runs complete</span><span data-progress-percent>0%</span></div>
-        <div class="progress-track"><span data-progress-bar style="width:2%"></span></div>
-      </div>
-
-      <div class="race-lanes" data-lanes></div>
-    </section>
+    <!-- Four accent streaks racing the width of the page. Decorative. On wide
+         screens they sit behind the hero and the scrim holds the copy legible
+         over them; below 760px they drop into flow underneath it and the
+         scrim goes away. Same animation either way — only the placement
+         changes. Ordered after the hero so the flow version needs no reorder. -->
+    <div class="field" aria-hidden="true">
+      <span class="streak" style="--accent: var(--teal)"></span>
+      <span class="streak" style="--accent: var(--mauve)"></span>
+      <span class="streak" style="--accent: var(--yellow)"></span>
+      <span class="streak" style="--accent: var(--blue)"></span>
+    </div>
+    <div class="scrim" aria-hidden="true"></div>
   </main>
 
   <footer class="footer-neu">
@@ -81,6 +105,7 @@
   </footer>
 
 </div>
-<script src="/race.js" type="module"></script>
+
+<script src="/copy.js"></script>
 </body>
 </html>
