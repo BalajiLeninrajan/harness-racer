@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft, ChevronRight, Flag, RotateCcw } from "lucide-react";
+import { AlertCircle, ArrowLeft, Flag, RotateCcw } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { Competitor, RunResult, SummaryRow } from "../../shared/types";
 import { formatMs, formatVisibleRate, ordinal } from "../benchmark";
@@ -27,7 +27,7 @@ export function ResultsPage({ competitors, results, summary, onEditGrid, onRaceA
       </div>
 
       {eligibleSummary.length >= 3 && (
-        <div className="podium-showcase panel">
+        <div className="podium-showcase well">
           <ol className="podium-grid" aria-label="Top three finishers">
             {eligibleSummary.slice(0, 3).map((row) => (
               <li className={`podium-entry rank-${row.finishRank}`} key={row.competitor.id} style={{ "--accent": row.competitor.color } as CSSProperties}>
@@ -75,20 +75,27 @@ export function ResultsPage({ competitors, results, summary, onEditGrid, onRaceA
       )}
 
       {invalidResults.length > 0 && (
-        <details className="invalid-results panel">
-          <summary><span><AlertCircle size={15} /> {invalidResults.length} {invalidResults.length === 1 ? "run anomaly" : "run anomalies"}</span><ChevronRight size={15} /></summary>
-          <div>
-            {invalidResults.map((result, index) => {
-              const competitor = competitors.find((item) => item.id === result.competitorId);
-              return (
-                <p key={`${result.competitorId}-${result.workload}-${result.sample}-${index}`}>
-                  <strong>{competitor?.label ?? "Unknown racer"} · {result.workload} · sample {result.sample}</strong>
-                  <span>{result.validationMessage ?? "The output was not valid for ranking."}</span>
-                </p>
-              );
-            })}
+        <div className="accordion invalid-results">
+          {/* The recipe's checkbox loses the disclosure's native Enter, so the
+              label restores it; Space still toggles the input natively. */}
+          <label onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).click(); }}>
+            <input type="checkbox" />
+            <span><AlertCircle size={15} /> {invalidResults.length} {invalidResults.length === 1 ? "run anomaly" : "run anomalies"}</span>
+          </label>
+          <div className="fold">
+            <div>
+              {invalidResults.map((result, index) => {
+                const competitor = competitors.find((item) => item.id === result.competitorId);
+                return (
+                  <p key={`${result.competitorId}-${result.workload}-${result.sample}-${index}`}>
+                    <strong>{competitor?.label ?? "Unknown racer"} · {result.workload} · sample {result.sample}</strong>
+                    <span>{result.validationMessage ?? "The output was not valid for ranking."}</span>
+                  </p>
+                );
+              })}
+            </div>
           </div>
-        </details>
+        </div>
       )}
 
       <div className="results-actions">

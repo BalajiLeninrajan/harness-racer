@@ -18,7 +18,11 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
   const raceRef = useRef<HTMLElement | null>(null);
   const streamRefs = useRef<Record<string, HTMLPreElement | null>>({});
   const expectedPerLane = totalRuns ? Math.ceil(totalRuns / Math.max(competitors.length, 1)) : 1;
-  const activeWorkload = Object.values(lanes).find((lane) => lane.status === "running" || lane.status === "starting")?.workload;
+  // Taken in grid order so the leading lane keys the overall bar when several
+  // race in parallel; undefined between heats, which falls back to the
+  // package's default progress gradient.
+  const activeCompetitor = competitors.find((competitor) => lanes[competitor.id]?.status === "running" || lanes[competitor.id]?.status === "starting");
+  const activeWorkload = activeCompetitor ? lanes[activeCompetitor.id]?.workload : undefined;
 
   useEffect(() => {
     raceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -56,7 +60,7 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
 
       <div className="overall-progress" role="progressbar" aria-label="Benchmark progress" aria-valuemin={0} aria-valuemax={totalRuns || 1} aria-valuenow={completedRuns}>
         <div><span>{completedRuns} / {totalRuns || "…"} runs complete</span><span>{totalRuns ? Math.round((completedRuns / totalRuns) * 100) : 0}%</span></div>
-        <div className="progress-track"><span style={{ width: `${totalRuns ? Math.min(100, (completedRuns / totalRuns) * 100) : 2}%` }} /></div>
+        <div className="progress-track" style={activeCompetitor ? { "--progress-fill": activeCompetitor.color } as CSSProperties : undefined}><span style={{ width: `${totalRuns ? Math.min(100, (completedRuns / totalRuns) * 100) : 2}%` }} /></div>
       </div>
 
       <div className="race-lanes">
@@ -67,19 +71,20 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
           const laneProgress = Math.min(100, (lane.completedRuns / expectedPerLane) * 100);
           return (
             <article className={`race-lane status-${lane.status}`} key={competitor.id} style={{ "--accent": competitor.color } as CSSProperties}>
-              <div className="lane-stripe" />
               <div className="lane-head">
-                <span className="mark-solid lane-position">P{index + 1}</span>
                 <ModelMark harness={competitor.harness} model={competitor.model} />
                 <div className="lane-identity"><strong>{competitor.label}</strong><span>{competitor.model}</span></div>
                 <div className="lane-status">
-                  {lane.status === "running" ? <><span className="live-dot" /> STREAMING</> : lane.status === "starting" || lane.status === "ready" || lane.status === "queued" ? <><LoaderCircle className="spin" size={13} /> {lane.status.toUpperCase()}</> : lane.status === "error" ? <><AlertCircle size={13} /> ERROR</> : <><Check size={13} /> HEAT DONE</>}
+                  <span className="lane-pos">P{index + 1}</span>
+                  <span className="lane-state">
+                    {lane.status === "running" ? <><span className="live-dot" /> STREAMING</> : lane.status === "starting" || lane.status === "ready" || lane.status === "queued" ? <><LoaderCircle className="spin" size={13} /> {lane.status.toUpperCase()}</> : lane.status === "error" ? <><AlertCircle size={13} /> ERROR</> : <><Check size={13} /> HEAT DONE</>}
+                  </span>
                 </div>
               </div>
               <div className="lane-metrics">
+                <Metric label="VISIBLE TOK/S" value={formatVisibleRate(lane.liveVisibleTokensPerSecond)} accent={lane.liveVisibleTokensPerSecond !== undefined} hero />
+                <Metric label="FIRST OUTPUT" value={formatMs(elapsedFirstOutput)} />
                 <Metric label="HARNESS PREP" value={formatMs(elapsedHarnessPrep)} />
-                <Metric label="FIRST OUTPUT" value={formatMs(elapsedFirstOutput)} accent={lane.firstOutputMs !== undefined} />
-                <Metric label="VISIBLE TOK/S" value={formatVisibleRate(lane.liveVisibleTokensPerSecond)} accent={lane.liveVisibleTokensPerSecond !== undefined} />
               </div>
               <div className="terminal stream-window">
                 <div className="stream-toolbar">
@@ -89,7 +94,7 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
                 <pre ref={(element) => { streamRefs.current[competitor.id] = element; }}>{lane.output || (lane.status === "error" ? lane.error : "Waiting for the green light…")}<span className={lane.status === "running" ? "caret" : "caret hidden"} /></pre>
               </div>
               {lane.error && <div className="lane-error"><AlertCircle size={13} /> {lane.error}</div>}
-              <div className="lane-progress"><span style={{ width: `${laneProgress}%` }} /></div>
+              <div className="progress-track lane-progress"><span style={{ width: `${laneProgress}%` }} /></div>
             </article>
           );
         })}
