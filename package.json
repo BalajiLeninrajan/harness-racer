@@ -63,7 +63,7 @@
     "@types/react-dom": "^19.2.0",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.0",
-    "catppuccin-neu": "github:BalajiLeninrajan/catppuccin-neu#v0.1.2",
+    "catppuccin-neu": "github:BalajiLeninrajan/catppuccin-neu#v0.1.3",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
