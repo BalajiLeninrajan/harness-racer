@@ -15,7 +15,7 @@ const metrics = [
 export function About({ onBack }: AboutProps) {
   return (
     <section className="about-view page-enter">
-      <button className="back-button" onClick={onBack}><ArrowLeft size={16} /> Back to the starting grid</button>
+      <button className="btn-text back-button" onClick={onBack}><ArrowLeft size={16} /> Back to the starting grid</button>
 
       <header className="about-summary">
         <h1>Methodology</h1>
@@ -28,10 +28,10 @@ export function About({ onBack }: AboutProps) {
 
       <section className="method-section">
         <div className="method-heading">
-          <span>01</span>
+          <span className="mark-solid">01</span>
           <div><h2>Test text</h2></div>
         </div>
-        <div className="limits-card panel source-copy">
+        <div className="limits-card well source-copy">
           <p>Each racer is asked to reproduce the same two fixed texts exactly:</p>
           <ul>
             <li>
@@ -50,20 +50,20 @@ export function About({ onBack }: AboutProps) {
       <section className="method-section method-split">
         <div>
           <div className="method-heading compact">
-            <span>02</span>
+            <span className="mark-solid">02</span>
             <div><h2>Run order</h2></div>
           </div>
-          <div className="sample-table panel option-definitions">
+          <div className="sample-table well">
             <div><span>PARALLEL</span><strong>All racers prepare, then start together. This is faster, but they share local resources and network capacity.</strong></div>
             <div><span>SEQUENTIAL</span><strong>Racers run one at a time. This takes longer but reduces contention between racers.</strong></div>
           </div>
         </div>
         <div>
           <div className="method-heading compact">
-            <span>03</span>
+            <span className="mark-solid">03</span>
             <div><h2>Samples</h2></div>
           </div>
-          <div className="sample-table panel option-definitions">
+          <div className="sample-table well">
             <div><span>QUICK</span><strong>No warmup, then 1 measured run for each text (2 measured runs total per racer).</strong></div>
             <div><span>STANDARD</span><strong>1 warmup and 3 measured runs for each text (2 warmups and 6 measured runs total).</strong></div>
             <div><span>THOROUGH</span><strong>1 warmup and 5 measured runs for each text (2 warmups and 10 measured runs total).</strong></div>
@@ -73,10 +73,10 @@ export function About({ onBack }: AboutProps) {
 
       <section className="method-section">
         <div className="method-heading">
-          <span>04</span>
+          <span className="mark-solid">04</span>
           <div><h2>Measurements and ranking</h2></div>
         </div>
-        <div className="metric-definitions panel">
+        <div className="metric-definitions well">
           {metrics.map(([label, description]) => (
             <article key={label}>
               <div><h3>{label}</h3><p>{description}</p></div>
@@ -91,10 +91,10 @@ export function About({ onBack }: AboutProps) {
 
       <section className="method-section">
         <div className="method-heading">
-          <span>05</span>
+          <span className="mark-solid">05</span>
           <div><h2>Limitations</h2></div>
         </div>
-        <div className="limits-card panel">
+        <div className="limits-card well">
           <ul>
             <li>Hidden reasoning and provider-native token counts are not compared.</li>
             <li>Account tier, configuration, provider load, network conditions, and the local machine can affect results.</li>

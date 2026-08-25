@@ -9,9 +9,11 @@ export function ModelMark({ harness, model }: { harness: HarnessId; model: strin
   );
 }
 
-export function Metric({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+/* Label-then-value in the DOM so it reads as "visible tok/s, 38.4"; the lane
+   flips it visually. `hero` is the package's headline-metric treatment. */
+export function Metric({ label, value, accent, hero }: { label: string; value: string; accent?: boolean; hero?: boolean }) {
   return (
-    <div className={`metric ${accent ? "metric-accent" : ""}`}>
+    <div className={`metric ${hero ? "is-hero" : ""} ${accent ? "metric-accent" : ""}`}>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>

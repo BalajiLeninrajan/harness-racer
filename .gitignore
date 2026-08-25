@@ -5,3 +5,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# generated from the catppuccin-neu package by `pnpm sync`; not committed
+site/public/tokens.css
+site/public/utilities.css
+site/public/recipes.css
+site/public/index.css

@@ -57,6 +57,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.0
         version: 6.0.2(vite@8.0.13(@types/node@22.19.19)(esbuild@0.27.3)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.0))
+      catppuccin-neu:
+        specifier: github:BalajiLeninrajan/catppuccin-neu#v0.1.3
+        version: https://codeload.github.com/BalajiLeninrajan/catppuccin-neu/tar.gz/114914ea220715be069b8982375ad4a929cbcd22
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.16)(tsx@4.23.0)(typescript@5.9.3)
@@ -903,6 +906,12 @@ packages:
   call-bound@1.0.4:
     resolution: {integrity: sha512-+ys997U96po4Kx/ABpBCqhA9EuxJaQWDQg7295H4hBphv3IZg0boBKuwYpt4YXp6MZ5AmZQnU/tyMTlRpaSejg==}
     engines: {node: '>= 0.4'}
+
+  catppuccin-neu@https://codeload.github.com/BalajiLeninrajan/catppuccin-neu/tar.gz/114914ea220715be069b8982375ad4a929cbcd22:
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/BalajiLeninrajan/catppuccin-neu/tar.gz/114914ea220715be069b8982375ad4a929cbcd22}
+    version: 0.1.3
+    engines: {node: '>=18'}
+    hasBin: true
 
   chai@6.2.2:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
@@ -2458,6 +2467,8 @@ snapshots:
     dependencies:
       call-bind-apply-helpers: 1.0.2
       get-intrinsic: 1.3.0
+
+  catppuccin-neu@https://codeload.github.com/BalajiLeninrajan/catppuccin-neu/tar.gz/114914ea220715be069b8982375ad4a929cbcd22: {}
 
   chai@6.2.2: {}
 

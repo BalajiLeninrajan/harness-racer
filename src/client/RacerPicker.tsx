@@ -171,14 +171,13 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
             aria-label="Choose a model"
             onKeyDown={trapDialogFocus}
           >
-            <aside className="racer-picker-sidebar" aria-label="Harnesses">
+            <aside className="racer-picker-sidebar segmented is-stacked" aria-label="Harnesses">
               {providers.map((provider) => (
                 <button
                   type="button"
                   className={provider.id === activeHarness ? "active" : ""}
                   aria-pressed={provider.id === activeHarness}
                   aria-label={provider.name}
-                  title={provider.name}
                   key={provider.id}
                   onClick={() => {
                     setActiveHarness(provider.id);
@@ -192,24 +191,27 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
               ))}
             </aside>
             <div className="racer-picker-search">
-              <Search size={15} />
-              <input
-                ref={searchRef}
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setHighlighted(0);
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="Search models"
-                aria-label="Search models"
-                aria-autocomplete="list"
-                role="combobox"
-                aria-controls={listboxId}
-                aria-expanded="true"
-                aria-activedescendant={filtered[highlighted] ? `${listboxId}-${highlighted}` : undefined}
-              />
-              <button type="button" className="racer-picker-close" aria-label="Close model picker" onClick={closeAndFocus}><X size={16} /></button>
+              <div className="input-icon">
+                <Search size={18} />
+                <input
+                  className="input"
+                  ref={searchRef}
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setHighlighted(0);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Search models"
+                  aria-label="Search models"
+                  aria-autocomplete="list"
+                  role="combobox"
+                  aria-controls={listboxId}
+                  aria-expanded="true"
+                  aria-activedescendant={filtered[highlighted] ? `${listboxId}-${highlighted}` : undefined}
+                />
+              </div>
+              <button type="button" className="btn-icon" aria-label="Close model picker" onClick={closeAndFocus}><X size={16} /></button>
             </div>
             <div className="racer-picker-options" id={listboxId} role="listbox" aria-label={`${activeProvider?.name ?? "Harness"} models`}>
               <div className="racer-picker-pane-label" role="presentation" aria-hidden="true">
