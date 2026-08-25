@@ -3,21 +3,22 @@
    --hard-offset-color, the density knobs). Depth canon: clickable controls
    default to the hard offset shadow and press with the half-slide — rest
    --hard-offset (4px, 3px compact), hover translate(-1px,-1px), active a
-   half-slide onto the shadow, which shrinks to meet it. Type: everything sets the sans face; mono
-   appears only in code-like contexts (.terminal, .codeblock, .cn-code). Inset surfaces
+   half-slide onto the shadow, which shrinks to meet it. Type: sans is the
+   default; mono ships on the code surfaces (.terminal, .codeblock, .cn-code)
+   and may be adopted elsewhere sparingly in a consumer layer. Inset surfaces
    are borderless — depth defines them; hairlines stay on raised surfaces
    and tinted semantic surfaces only.
    Requires tokens.css (+ utilities.css for .cn-scrim). Layer: cn.recipes.   */
 
 /* ── Surfaces ───────────────────────────────────────────────────────────── */
 
-/* Panel — the primary content container. Raised, with a top-left lift line. */
+/* Panel — the primary content container. Raised. */
 .panel {
   min-width: 0;
   border: 1px solid color-mix(in srgb, var(--surface-2) 40%, transparent);
   border-radius: var(--pane-radius);
   background: var(--base);
-  box-shadow: var(--neu-raised), inset 1px 1px color-mix(in srgb, var(--surface-2) 30%, transparent);
+  box-shadow: var(--neu-raised);
 }
 
 /* The one rotated, hard-shadowed hero card. Flattened at ≤1060px. */
@@ -298,8 +299,7 @@
   margin: 0 0 7px 1px;
   color: var(--overlay-2);
   font: 650 12px/1 var(--sans);
-  letter-spacing: .04em;
-  text-transform: uppercase;
+  letter-spacing: .01em;
 }
 
 /* Borderless inset well, carved from whatever surface it sits on: the
@@ -554,8 +554,6 @@
   background: color-mix(in srgb, var(--crust) 38%, var(--mantle));
   box-shadow: var(--neu-inset-soft);
   font: 650 12px/1 var(--sans);
-  letter-spacing: .08em;
-  text-transform: uppercase;
 }
 .stepper > .active,
 .stepper > [aria-current="step"] {
@@ -603,8 +601,7 @@
   border: 1px solid color-mix(in srgb, var(--tone) 45%, transparent);
   border-radius: 4px;
   background: color-mix(in srgb, var(--tone) 8%, transparent);
-  font: 750 12px/1 var(--sans);
-  text-transform: uppercase;
+  font: 650 12px/1 var(--sans);
 }
 
 /* Inline banner — semantic tint band, no card chrome. The tint keeps its
@@ -729,7 +726,7 @@
   border: 1px solid color-mix(in srgb, var(--surface-2) 42%, transparent);
   border-radius: 6px;
   background: var(--base);
-  box-shadow: var(--neu-raised-soft), inset 1px 1px color-mix(in srgb, var(--surface-2) 30%, transparent);
+  box-shadow: var(--neu-raised-soft);
   transform: perspective(120px) rotateY(16deg);
   transition: translate .2s, transform .2s, background .2s, box-shadow .2s, border-color .2s;
 }
@@ -956,7 +953,7 @@ a:active > .accent-card {
 
 /* ── Data display ───────────────────────────────────────────────────────── */
 
-/* Metric tile — micro-label above an oversized tabular number. */
+/* Metric tile — small label above an oversized tabular number. */
 .metric { min-width: 0; padding: 12px 13px; display: flex; flex-direction: column; gap: 6px; }
 .metric span {
   color: var(--overlay-1);
@@ -1309,7 +1306,7 @@ a:active > .accent-card {
   .topbar .nav-secondary { display: none; }
   .panel.is-tilted {
     transform: none;
-    box-shadow: var(--neu-raised), inset 1px 1px color-mix(in srgb, var(--surface-2) 30%, transparent);
+    box-shadow: var(--neu-raised);
   }
 }
 

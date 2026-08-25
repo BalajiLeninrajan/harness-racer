@@ -7,8 +7,6 @@
 
 .cn-raised      { box-shadow: var(--neu-raised); }
 .cn-raised-soft { box-shadow: var(--neu-raised-soft); }
-/* Raised with the lit top-left edge — larger surfaces only. */
-.cn-raised-lit  { box-shadow: var(--neu-raised), inset 1px 1px color-mix(in srgb, var(--surface-2) 30%, transparent); }
 .cn-inset       { box-shadow: var(--neu-inset); }
 .cn-inset-soft  { box-shadow: var(--neu-inset-soft); }
 /* Floats above the surface — overlays only, never neu. */
@@ -44,17 +42,20 @@
 
 /* ── Type roles ─────────────────────────────────────────────────────────────
    No bare font-family utility exists: pick the role, not the face.
-   Mono is scarce — reserved for code-like content (.cn-code, .terminal);
-   every other role sets the sans face. Numbers keep tabular-nums on sans.   */
+   Sans is the default voice: every shipped role is sans except .cn-code.
+   Mono is not forbidden elsewhere — in the rare right circumstance any text
+   may take it (a consumer-layer call, not a shipped default). Numbers keep
+   tabular-nums on the sans face. Uppercase is scarce — only the eyebrow and
+   the microlabel shout; everything else is sentence case.                   */
 
 .cn-label {
   font: 650 12px/1 var(--sans);
-  letter-spacing: .04em;
-  text-transform: uppercase;
+  letter-spacing: .01em;
   color: var(--overlay-2);
 }
 .cn-microlabel {
-  /* The one exception to the 12px floor: the smallest voice in the system. */
+  /* The one exception to the 12px floor: the smallest voice in the system.
+     One of the two uppercase voices — caps buy legibility at 10px. */
   font: 700 10px/1 var(--sans);
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -75,6 +76,7 @@
   color: var(--overlay-1);
 }
 .cn-eyebrow {
+  /* The other uppercase voice — one per page, announcing a section. */
   display: flex;
   align-items: center;
   gap: 8px;
@@ -83,7 +85,7 @@
   text-transform: uppercase;
   color: var(--mauve);
 }
-/* The one mono role — actual code, CLI strings, machine literals. */
+/* Inline code voice — code, CLI strings, machine literals. */
 .cn-code {
   font: 500 13px/1.6 var(--mono);
   font-variant-numeric: tabular-nums;
@@ -153,8 +155,8 @@
 .cn-tone-mauve  { --tone: var(--mauve); }
 
 /* ── Borders ──────────────────────────────────────────────────────────────
-   Hairlines belong to raised surfaces (where the lit edge needs support)
-   and tinted semantic surfaces. Inset surfaces are defined by depth alone. */
+   Hairlines belong to raised surfaces and tinted semantic surfaces.
+   Inset surfaces are defined by depth alone.                                */
 
 .cn-edge        { border: 1px solid color-mix(in srgb, var(--surface-2) 40%, transparent); }
 .cn-edge-soft   { border: 1px solid color-mix(in srgb, var(--surface-1) 38%, transparent); }  /* inner separators */

@@ -9,7 +9,7 @@
     "sync": "catppuccin-neu-sync public"
   },
   "devDependencies": {
-    "catppuccin-neu": "github:BalajiLeninrajan/catppuccin-neu#v0.1.1",
+    "catppuccin-neu": "github:BalajiLeninrajan/catppuccin-neu#v0.1.2",
     "wrangler": "^4.45.0"
   }
 }

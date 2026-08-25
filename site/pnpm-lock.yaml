@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       catppuccin-neu:
-        specifier: github:BalajiLeninrajan/catppuccin-neu#v0.1.1
-        version: https://codeload.github.com/BalajiLeninrajan/catppuccin-neu/tar.gz/d8edc5aef254c9fa99c36e10f3b982cd728847aa
+        specifier: github:BalajiLeninrajan/catppuccin-neu#v0.1.2
+        version: https://codeload.github.com/BalajiLeninrajan/catppuccin-neu/tar.gz/c921d3abddc249068c86e0d033d57dc83025ffc9
       wrangler:
         specifier: ^4.45.0
         version: 4.120.1
@@ -414,9 +414,9 @@ packages:
   blake3-wasm@2.1.5:
     resolution: {integrity: sha512-F1+K8EbfOZE49dtoPtmxUQrpXaBIl3ICvasLh+nJta0xkz+9kF/7uet9fLnwKqhDrmj6g+6K3Tw9yQPUg2ka5g==}
 
-  catppuccin-neu@https://codeload.github.com/BalajiLeninrajan/catppuccin-neu/tar.gz/d8edc5aef254c9fa99c36e10f3b982cd728847aa:
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/BalajiLeninrajan/catppuccin-neu/tar.gz/d8edc5aef254c9fa99c36e10f3b982cd728847aa}
-    version: 0.1.1
+  catppuccin-neu@https://codeload.github.com/BalajiLeninrajan/catppuccin-neu/tar.gz/c921d3abddc249068c86e0d033d57dc83025ffc9:
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/BalajiLeninrajan/catppuccin-neu/tar.gz/c921d3abddc249068c86e0d033d57dc83025ffc9}
+    version: 0.1.2
     engines: {node: '>=18'}
     hasBin: true
 
@@ -756,7 +756,7 @@ snapshots:
 
   blake3-wasm@2.1.5: {}
 
-  catppuccin-neu@https://codeload.github.com/BalajiLeninrajan/catppuccin-neu/tar.gz/d8edc5aef254c9fa99c36e10f3b982cd728847aa: {}
+  catppuccin-neu@https://codeload.github.com/BalajiLeninrajan/catppuccin-neu/tar.gz/c921d3abddc249068c86e0d033d57dc83025ffc9: {}
 
   cookie@1.1.1: {}
 
