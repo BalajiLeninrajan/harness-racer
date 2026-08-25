@@ -46,11 +46,11 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
         </div>
         <div className="race-header-right">
           <div className="heat-switcher">
-            <span className={activeWorkload === "prose" ? "active" : activeWorkload === "code" ? "done" : ""}><span>01</span> Attention paper</span>
+            <span className={activeWorkload === "prose" ? "active" : activeWorkload === "code" ? "is-done" : ""}><span>01</span> Attention paper</span>
             <i />
             <span className={activeWorkload === "code" ? "active" : ""}><span>02</span> nanoGPT attention</span>
           </div>
-          <button className="cancel-button" onClick={onCancel}><CircleStop size={15} /> Cancel</button>
+          <button className="btn btn-secondary cancel-button" onClick={onCancel}><CircleStop size={15} /> Cancel</button>
         </div>
       </div>
 
@@ -66,10 +66,10 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
           const elapsedFirstOutput = lane.status === "running" && lane.firstOutputMs === undefined && lane.runningStartedAt ? now - lane.runningStartedAt : lane.firstOutputMs;
           const laneProgress = Math.min(100, (lane.completedRuns / expectedPerLane) * 100);
           return (
-            <article className={`race-lane status-${lane.status}`} key={competitor.id} style={{ "--lane-color": competitor.color } as CSSProperties}>
+            <article className={`race-lane status-${lane.status}`} key={competitor.id} style={{ "--accent": competitor.color } as CSSProperties}>
               <div className="lane-stripe" />
               <div className="lane-head">
-                <span className="lane-position">P{index + 1}</span>
+                <span className="mark-solid lane-position">P{index + 1}</span>
                 <ModelMark harness={competitor.harness} model={competitor.model} />
                 <div className="lane-identity"><strong>{competitor.label}</strong><span>{competitor.model}</span></div>
                 <div className="lane-status">
@@ -81,12 +81,12 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
                 <Metric label="FIRST OUTPUT" value={formatMs(elapsedFirstOutput)} accent={lane.firstOutputMs !== undefined} />
                 <Metric label="VISIBLE TOK/S" value={formatVisibleRate(lane.liveVisibleTokensPerSecond)} accent={lane.liveVisibleTokensPerSecond !== undefined} />
               </div>
-              <div className="stream-window">
+              <div className="terminal stream-window">
                 <div className="stream-toolbar">
                   <span><Code2 size={13} /> {workloadFilename(lane.workload)}</span>
                   <span>{lane.warmup ? "WARMUP" : lane.sample !== undefined ? `SAMPLE ${lane.sample}` : "QUEUED"}</span>
                 </div>
-                <pre ref={(element) => { streamRefs.current[competitor.id] = element; }}>{lane.output || (lane.status === "error" ? lane.error : "Waiting for the green light…")}<span className={lane.status === "running" ? "cursor" : "cursor hidden"} /></pre>
+                <pre ref={(element) => { streamRefs.current[competitor.id] = element; }}>{lane.output || (lane.status === "error" ? lane.error : "Waiting for the green light…")}<span className={lane.status === "running" ? "caret" : "caret hidden"} /></pre>
               </div>
               {lane.error && <div className="lane-error"><AlertCircle size={13} /> {lane.error}</div>}
               <div className="lane-progress"><span style={{ width: `${laneProgress}%` }} /></div>
@@ -94,7 +94,7 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
           );
         })}
       </div>
-      {notice && <div className="inline-warning race-warning"><AlertCircle size={15} /> {notice}</div>}
+      {notice && <div className="banner cn-tone-peach race-warning"><AlertCircle size={15} /> {notice}</div>}
     </section>
   );
 }

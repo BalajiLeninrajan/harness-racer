@@ -88,10 +88,10 @@ function buildField() {
   lanesRoot.innerHTML = field
     .map(
       (racer, index) => `
-    <article class="race-lane status-queued" data-lane="${racer.id}" style="--lane-color:${racer.color}">
+    <article class="race-lane status-queued" data-lane="${racer.id}" style="--accent:${racer.color}">
       <div class="lane-stripe"></div>
       <div class="lane-head">
-        <span class="lane-position">P${index + 1}</span>
+        <span class="mark-solid lane-position">P${index + 1}</span>
         <span class="harness-mark">${icon(ICONS[racer.icon])}</span>
         <div class="lane-identity"><strong>${racer.label}</strong><span>${racer.model}</span></div>
         <div class="lane-status" data-status></div>
@@ -101,12 +101,12 @@ function buildField() {
         <div class="metric" data-ttfo-metric><span>FIRST OUTPUT</span><strong data-ttfo>—</strong></div>
         <div class="metric" data-rate-metric><span>VISIBLE TOK/S</span><strong data-rate>—</strong></div>
       </div>
-      <div class="stream-window">
+      <div class="terminal stream-window">
         <div class="stream-toolbar">
           <span>${icon(LUCIDE.code, true)} <b data-file>awaiting-stream</b></span>
           <span data-sample>QUEUED</span>
         </div>
-        <pre class="idle" data-output>Waiting for the green light…<span class="cursor hidden"></span></pre>
+        <pre class="idle" data-output>Waiting for the green light…<span class="caret hidden"></span></pre>
       </div>
       <div class="lane-progress"><span data-lane-progress style="width:0%"></span></div>
     </article>`,
@@ -231,7 +231,7 @@ function render() {
 
   for (const [id, node] of Object.entries(heatNodes)) {
     const index = HEATS.indexOf(id);
-    node.className = index === heatIndex ? "active" : index < heatIndex ? "done" : "";
+    node.className = index === heatIndex ? "active" : index < heatIndex ? "is-done" : "";
   }
 
   const percent = Math.round((completedRuns / totalRuns()) * 100);
@@ -268,7 +268,7 @@ function render() {
     el.output.className = shown ? "" : "idle";
     el.output.textContent = shown || "Waiting for the green light…";
     const caret = document.createElement("span");
-    caret.className = lane.status === "running" ? "cursor" : "cursor hidden";
+    caret.className = lane.status === "running" ? "caret" : "caret hidden";
     el.output.append(caret);
     if (lane.status === "running") el.output.scrollTop = el.output.scrollHeight;
 

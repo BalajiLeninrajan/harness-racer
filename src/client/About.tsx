@@ -15,7 +15,7 @@ const metrics = [
 export function About({ onBack }: AboutProps) {
   return (
     <section className="about-view page-enter">
-      <button className="back-button" onClick={onBack}><ArrowLeft size={16} /> Back to the starting grid</button>
+      <button className="btn-text back-button" onClick={onBack}><ArrowLeft size={16} /> Back to the starting grid</button>
 
       <header className="about-summary">
         <h1>Methodology</h1>
@@ -28,7 +28,7 @@ export function About({ onBack }: AboutProps) {
 
       <section className="method-section">
         <div className="method-heading">
-          <span>01</span>
+          <span className="mark-solid">01</span>
           <div><h2>Test text</h2></div>
         </div>
         <div className="limits-card panel source-copy">
@@ -50,7 +50,7 @@ export function About({ onBack }: AboutProps) {
       <section className="method-section method-split">
         <div>
           <div className="method-heading compact">
-            <span>02</span>
+            <span className="mark-solid">02</span>
             <div><h2>Run order</h2></div>
           </div>
           <div className="sample-table panel option-definitions">
@@ -60,7 +60,7 @@ export function About({ onBack }: AboutProps) {
         </div>
         <div>
           <div className="method-heading compact">
-            <span>03</span>
+            <span className="mark-solid">03</span>
             <div><h2>Samples</h2></div>
           </div>
           <div className="sample-table panel option-definitions">
@@ -73,7 +73,7 @@ export function About({ onBack }: AboutProps) {
 
       <section className="method-section">
         <div className="method-heading">
-          <span>04</span>
+          <span className="mark-solid">04</span>
           <div><h2>Measurements and ranking</h2></div>
         </div>
         <div className="metric-definitions panel">
@@ -91,7 +91,7 @@ export function About({ onBack }: AboutProps) {
 
       <section className="method-section">
         <div className="method-heading">
-          <span>05</span>
+          <span className="mark-solid">05</span>
           <div><h2>Limitations</h2></div>
         </div>
         <div className="limits-card panel">

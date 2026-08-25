@@ -18,19 +18,16 @@ export function AppHeader({ page, phase, socketState, onHome, onToggleAbout }: A
         <span className="brand-icon"><Gauge size={19} /></span>
         <span><b>harness</b>.racer</span>
       </button>
-      <div className={page === "about" ? "page-context" : "phase-track"} aria-label={page === "about" ? "Current page" : "Benchmark progress"}>
+      <div className={page === "about" ? "page-context" : "stepper phase-track"} aria-label={page === "about" ? "Current page" : "Benchmark progress"}>
         {page === "about" ? <><Info size={13} /> Methodology</> : <>
-          <span className={phase === "setup" ? "active" : "done"}><i>1</i>Racers</span>
-          <b />
-          <span className={phase === "review" ? "active" : phase === "running" || phase === "results" ? "done" : ""}><i>2</i>Grid</span>
-          <b />
-          <span className={phase === "running" ? "active" : phase === "results" ? "done" : ""}><i>3</i>Race</span>
-          <b />
+          <span className={phase === "setup" ? "active" : "is-done"}><i>1</i>Racers</span>
+          <span className={phase === "review" ? "active" : phase === "running" || phase === "results" ? "is-done" : ""}><i>2</i>Grid</span>
+          <span className={phase === "running" ? "active" : phase === "results" ? "is-done" : ""}><i>3</i>Race</span>
           <span className={phase === "results" ? "active" : ""}><i>4</i>Results</span>
         </>}
       </div>
       <div className="topbar-actions">
-        <button className={`about-button ${page === "about" ? "active" : ""}`} disabled={phase === "running"} onClick={onToggleAbout}><Info size={14} /> {page === "about" ? "Back to race" : "Methodology"}</button>
+        <button className={`btn-flat about-button ${page === "about" ? "active" : ""}`} disabled={phase === "running"} onClick={onToggleAbout}><Info size={14} /> {page === "about" ? "Back to race" : "Methodology"}</button>
         <div className={`connection connection-${socketState}`} role="status">
           {socketState === "open" ? <Wifi size={14} /> : socketState === "connecting" ? <LoaderCircle className="spin" size={14} /> : <WifiOff size={14} />}
           {socketState === "open" ? "engine ready" : socketState === "connecting" ? "waking up" : "engine offline"}

@@ -12,8 +12,11 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..850&family=JetBrains+Mono:wght@500;650;800&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" />
+<!-- catppuccin-neu, vendored via `pnpm exec catppuccin-neu-sync public` -->
 <link rel="stylesheet" href="/tokens.css" />
+<link rel="stylesheet" href="/utilities.css" />
+<link rel="stylesheet" href="/recipes.css" />
 <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -44,7 +47,7 @@
       </button>
 
       <div class="hero-stats">
-        <span>Codex</span><span>Claude Code</span><span>Cursor</span><span>Grok</span><span>OpenCode</span>
+        <span class="chip">Codex</span><span class="chip">Claude Code</span><span class="chip">Cursor</span><span class="chip">Grok</span><span class="chip">OpenCode</span>
       </div>
     </section>
 
@@ -72,7 +75,7 @@
     </section>
   </main>
 
-  <footer>
+  <footer class="footer-neu">
     <div class="footer-brand"><strong><b>harness</b>.racer</strong><span>MIT licensed</span></div>
     <span class="footer-note">Made with 💜 in Waterloo</span>
   </footer>
