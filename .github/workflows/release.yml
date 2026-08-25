@@ -35,8 +35,12 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
+      # Node 22.13.0 ships npm 10, which predates OIDC trusted publishing
+      # (npm 11.5.1+). Pinned to the 11 line rather than @latest: npm 12
+      # requires node ^22.22.2, so `npm@latest` breaks against the node pinned
+      # above every time npm raises its floor. Move both together or neither.
       - name: Upgrade npm for trusted publishing
-        run: npm install -g npm@latest
+        run: npm install -g npm@^11.5.1
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
