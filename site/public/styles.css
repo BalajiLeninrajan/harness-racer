@@ -1,6 +1,6 @@
-/* Harness Racer landing page — app-specific layer over the vendored
-   catppuccin-neu design system (tokens.css / utilities.css / recipes.css,
-   synced via `pnpm exec catppuccin-neu-sync public`).
+/* Harness Racer landing page — app-specific layer over the catppuccin-neu
+   design system, which index.html loads from jsDelivr (css/index.css puts
+   tokens / utilities / recipes in cn.* layers, so this unlayered file wins).
 
    The page is one screen: brand bar, headline, the harnesses it drives, the
    install command, and an animated field behind them. It deliberately does

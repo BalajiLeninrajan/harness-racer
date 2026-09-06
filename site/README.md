@@ -22,6 +22,7 @@ soon as the app's lane was redesigned. Keep it that way: if the page ever needs
 to show real app chrome again, share a source with `src/client` rather than
 copying one.
 
-`public/tokens.css`, `utilities.css`, `recipes.css`, and `index.css` are
-generated from the `catppuccin-neu` package by `pnpm sync` and are not
-committed — run it after bumping the package rather than editing them here.
+The `catppuccin-neu` design system is not installed here. `index.html` links
+it straight from jsDelivr, pinned to a git tag. When the app bumps its
+`catppuccin-neu` version in the root `package.json`, bump the tag in that
+`<link>` too so the page and the app share one design system version.
