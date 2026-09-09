@@ -3,8 +3,8 @@ import { Gauge } from "lucide-react";
 export function AppFooter() {
   return (
     <footer className="footer-neu">
-      <div className="footer-brand"><Gauge size={16} /><strong><b>harness</b>.racer</strong><span>Model speed benchmark</span></div>
-      <span className="footer-note">Made with 💜 in Waterloo</span>
+      <span className="footer-brand"><Gauge /><strong className="cn-name"><em>harness</em>.racer</strong><span>Model speed benchmark</span></span>
+      <span>Made with 💜 in Waterloo</span>
     </footer>
   );
 }

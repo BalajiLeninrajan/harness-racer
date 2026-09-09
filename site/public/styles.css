@@ -1,64 +1,23 @@
 /* Harness Racer landing page — app-specific layer over the catppuccin-neu
    design system, which index.html loads from jsDelivr (css/index.css puts
-   tokens / utilities / recipes in cn.* layers, so this unlayered file wins).
+   tokens / recipes / utilities in cn.* layers, so this unlayered file wins).
 
    The page is one screen: brand bar, headline, the harnesses it drives, the
    install command, and an animated field behind them. It deliberately does
    not mirror any part of the app UI — the previous simulated race duplicated
    ~100 lines of lane styling from src/client and went stale the moment the
-   app's lane was redesigned. Per-lane color rides the --accent contract prop. */
+   app's lane was redesigned. Per-lane color rides the --accent contract prop.
 
-.app-shell {
-  min-height: 100vh;
-  min-height: 100dvh;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  position: relative;
-  overflow-x: clip;
-}
+   The shell, page column, topbar, wordmark, buttons, chips, command row and
+   footer are all package recipes; what lives here is the hero's placement,
+   the streak field, and its scrim. */
 
-main {
-  width: min(1240px, calc(100% - 40px));
-  min-width: 0;
-  margin: 0 auto;
-  position: relative;
-  display: grid;
-  align-content: center;
-  overflow: hidden;
-}
+/* The hero centres in whatever height the shell leaves it; the field behind
+   it is clipped to the column. */
+main { display: grid; align-content: center; overflow: hidden; }
 
-/* ── Topbar ───────────────────────────────────────────────────────────────── */
-
-/* Two-item bar: brand left, links right (the recipe's three-column grid
-   would center the nav). */
-.topbar { display: flex; justify-content: space-between; }
-.brand { display: flex; align-items: center; gap: 9px; color: inherit; text-decoration: none; font-size: 15px; font-weight: 750; letter-spacing: -.02em; border-radius: 8px; }
-.brand b { color: var(--mauve); }
-.brand-icon {
-  width: 34px; height: 34px;
-  display: grid; place-items: center;
-  color: var(--crust);
-  background: var(--mauve);
-  border-radius: 10px 10px 10px 4px;
-  box-shadow: var(--hard-offset) var(--hard-offset) 0 color-mix(in srgb, var(--mauve) 25%, var(--surface-0));
-}
-.topbar-actions { display: flex; align-items: center; gap: 8px; }
-.ghost-link {
-  min-height: 32px;
-  padding: 0 12px;
-  display: flex; align-items: center;
-  color: var(--subtext-0);
-  text-decoration: none;
-  border: 1px solid color-mix(in srgb, var(--surface-2) 42%, transparent);
-  border-radius: 8px;
-  background: var(--base);
-  box-shadow: var(--neu-raised-soft);
-  font: 700 12px/1 var(--sans);
-  letter-spacing: .04em;
-  transition: color .18s, border-color .18s, transform .18s, box-shadow .18s;
-}
-.ghost-link:hover { color: var(--mauve); border-color: color-mix(in srgb, var(--mauve) 55%, transparent); transform: translateY(-1px); }
-.ghost-link:active { transform: translateY(1px); box-shadow: var(--neu-inset-soft); }
+/* The brand tile keeps its asymmetric corner. */
+.wordmark > .mark-solid { border-radius: 10px 10px 10px 4px; }
 
 /* ── The field ────────────────────────────────────────────────────────────
    Four accent streaks racing the width of the page on a loop. Each one grows
@@ -112,66 +71,7 @@ main {
 /* ── Hero ─────────────────────────────────────────────────────────────────── */
 
 .hero { position: relative; z-index: 2; padding: clamp(30px, 6vw, 60px) 0; }
-.hero h1 { margin: 16px 0 0; max-width: 15ch; font-size: clamp(34px, 5.2vw, 54px); line-height: .96; letter-spacing: -.052em; font-weight: 820; }
-.hero h1 em { color: var(--mauve); font-style: normal; }
-
-/* The harnesses it drives — the one qualifying question a visitor has. */
-.hero-harnesses { margin: 24px 0 26px; display: flex; flex-wrap: wrap; gap: 8px; }
-
-/* CLI one-liner. Composes .well: a carved well, because the command is what
-   you reach into and take. The explicit dark fill is set here because the
-   recipe's own transparent ground wins the cascade order. Mono is earned —
-   it is a command. */
-.command {
-  /* Wide enough for the command and the button, never the whole hero column:
-     space-between needs a bounded width to mean anything. */
-  width: min(400px, 100%);
-  min-height: 48px;
-  padding: 7px 7px 7px 16px;
-  display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  background: color-mix(in srgb, var(--crust) 38%, var(--mantle));
-}
-.command-text {
-  min-width: 0;
-  display: flex; align-items: center;
-  color: var(--text);
-  font: 650 13px/1.4 var(--mono);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.01em;
-  overflow-x: auto;
-  white-space: nowrap;
-}
-.command-prompt { margin-right: 10px; color: var(--mauve); user-select: none; }
-
-/* An icon button, not a worded CTA: the command is the thing being read, and
-   a chip spelling "COPY" beside it took the eye first. The recipe is flat
-   until hovered, when it tints toward --tone — mauve here, the page's one
-   accent, rather than the token default. */
-.copy {
-  flex: 0 0 auto;
-  --tone: var(--mauve);
-}
-.copy svg { width: 15px; height: 15px; }
-
-/* Copied — the glyph becomes a check and goes green for the moment copy.js
-   holds the state. Both glyphs are in the markup; only which one shows moves,
-   so the swap cannot flash an empty button. */
-.copy .done-glyph { display: none; }
-/* --tone is re-keyed, not just the color: the recipe's hover rule paints from
-   --tone at a higher specificity than this class, and the pointer is by
-   definition on the button the moment it flips — a plain `color` here would
-   lose and show a mauve check. */
-.copy.done { --tone: var(--green); color: var(--green); }
-.copy.done .copy-glyph { display: none; }
-.copy.done .done-glyph { display: block; }
-
-/* ── Footer ───────────────────────────────────────────────────────────────── */
-
-.footer-neu { width: min(1240px, calc(100% - 40px)); }
-.footer-brand { display: flex; align-items: center; gap: 10px; }
-.footer-brand strong { color: var(--text); font: 750 13px var(--sans); letter-spacing: -.02em; }
-.footer-brand b { color: var(--mauve); }
-.footer-note { font: 550 12px/1 var(--sans); }
+.hero h1 { margin: 16px 0 0; max-width: 15ch; }
 
 /* ── Responsive ───────────────────────────────────────────────────────────
    The design system's own breakpoints: 760 and 520. Each removes decoration
@@ -185,8 +85,7 @@ main {
 @media (max-width: 760px) {
   /* Two auto rows centred as one composition, rather than the field owning a
      1fr row it then floats in the middle of. */
-  main { width: calc(100% - 28px); align-content: center; grid-template-rows: auto auto; gap: clamp(30px, 6vh, 58px); }
-  .footer-neu { width: calc(100% - 28px); }
+  main { grid-template-rows: auto auto; gap: clamp(30px, 6vh, 58px); }
 
   /* Gap under the bar height, so the four streaks stack into one object
      instead of reading as separate rules spread down the page. */
@@ -194,14 +93,11 @@ main {
   .scrim { display: none; }
 
   .hero { padding: 0; }
-  .command { width: 100%; gap: 12px; }
 }
 
-/* 520 — tighten the type and stack the footer. */
+/* 520 — let the headline wrap freely. */
 @media (max-width: 520px) {
-  .hero h1 { max-width: none; font-size: clamp(30px, 8.6vw, 36px); }
-  .hero-harnesses { margin: 20px 0 22px; gap: 7px; }
-  .footer-neu { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .hero h1 { max-width: none; }
 }
 
 /* The package's reduced-motion block collapses every animation to .01ms and a
