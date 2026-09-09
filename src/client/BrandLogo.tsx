@@ -1,4 +1,5 @@
 import anthropicLogo from "@lobehub/icons-static-svg/icons/anthropic.svg?url";
+import antigravityLogo from "@lobehub/icons-static-svg/icons/antigravity.svg?url";
 import codexLogo from "@lobehub/icons-static-svg/icons/codex.svg?url";
 import cursorLogo from "@lobehub/icons-static-svg/icons/cursor.svg?url";
 import deepseekLogo from "@lobehub/icons-static-svg/icons/deepseek.svg?url";
@@ -11,10 +12,11 @@ import opencodeLogo from "@lobehub/icons-static-svg/icons/opencode.svg?url";
 import qwenLogo from "@lobehub/icons-static-svg/icons/qwen.svg?url";
 import type { HarnessId } from "../shared/types";
 
-type LogoId = "anthropic" | "codex" | "cursor" | "deepseek" | "gemini" | "grok" | "meta" | "mistral" | "openai" | "opencode" | "qwen";
+type LogoId = "anthropic" | "antigravity" | "codex" | "cursor" | "deepseek" | "gemini" | "grok" | "meta" | "mistral" | "openai" | "opencode" | "qwen";
 
 const LOGOS: Record<LogoId, { label: string; src: string }> = {
   anthropic: { label: "Anthropic", src: anthropicLogo },
+  antigravity: { label: "Antigravity", src: antigravityLogo },
   codex: { label: "Codex", src: codexLogo },
   cursor: { label: "Cursor", src: cursorLogo },
   deepseek: { label: "DeepSeek", src: deepseekLogo },
@@ -33,6 +35,7 @@ const HARNESS_LOGOS: Record<HarnessId, LogoId> = {
   cursor: "cursor",
   grok: "grok",
   opencode: "opencode",
+  antigravity: "antigravity",
 };
 
 export function modelLab(model: string, harness: HarnessId): LogoId {

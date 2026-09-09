@@ -1,4 +1,5 @@
 import { HARNESS_IDS, type HarnessId } from "../../shared/types.js";
+import { antigravityAdapter } from "./antigravity.js";
 import { claudeAdapter } from "./claude.js";
 import { codexAdapter } from "./codex.js";
 import { cursorAdapter } from "./cursor.js";
@@ -6,6 +7,7 @@ import { grokAdapter } from "./grok.js";
 import { openCodeAdapter } from "./opencode.js";
 import type { HarnessAdapter } from "./types.js";
 
+export { antigravityAdapter } from "./antigravity.js";
 export { claudeAdapter } from "./claude.js";
 export { codexAdapter } from "./codex.js";
 export { cursorAdapter } from "./cursor.js";
@@ -20,6 +22,7 @@ export const adapterRegistry = {
   cursor: cursorAdapter,
   grok: grokAdapter,
   opencode: openCodeAdapter,
+  antigravity: antigravityAdapter,
 } satisfies { [Id in HarnessId]: HarnessAdapter<Id> };
 
 for (const id of HARNESS_IDS) {
