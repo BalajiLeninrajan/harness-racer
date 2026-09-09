@@ -152,9 +152,9 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
         <span className="racer-picker-logo" aria-hidden="true">
           <ModelLabLogo model={selected?.model.id ?? model} harness={selected?.provider.id ?? harness} size={22} />
         </span>
-        <span className="racer-picker-copy">
-          <strong>{selected?.model.label ?? model}</strong>
-          <small>{selected ? `${modelLabName(selected.model.id, selected.provider.id)} · via ${selected.provider.name}` : "Choose a model"}</small>
+        <span className="racer-picker-copy cn-grow cn-stack cn-gap-4">
+          <strong className="cn-truncate">{selected?.model.label ?? model}</strong>
+          <small className="cn-code-meta cn-truncate">{selected ? `${modelLabName(selected.model.id, selected.provider.id)} · via ${selected.provider.name}` : "Choose a model"}</small>
         </span>
         <Pencil className="racer-picker-cue" size={15} />
       </button>
@@ -175,7 +175,6 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
               {providers.map((provider) => (
                 <button
                   type="button"
-                  className={provider.id === activeHarness ? "active" : ""}
                   aria-pressed={provider.id === activeHarness}
                   aria-label={provider.name}
                   key={provider.id}
@@ -190,8 +189,8 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
                 </button>
               ))}
             </aside>
-            <div className="racer-picker-search">
-              <div className="input-icon">
+            <div className="racer-picker-search cn-row">
+              <div className="input-icon cn-grow">
                 <Search size={18} />
                 <input
                   className="input"
@@ -214,9 +213,9 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
               <button type="button" className="btn-icon" aria-label="Close model picker" onClick={closeAndFocus}><X size={16} /></button>
             </div>
             <div className="racer-picker-options" id={listboxId} role="listbox" aria-label={`${activeProvider?.name ?? "Harness"} models`}>
-              <div className="racer-picker-pane-label" role="presentation" aria-hidden="true">
-                {activeProvider && <><HarnessLogo harness={activeProvider.id} size={14} /><strong>{activeProvider.name}</strong></>}
-                <span>{filtered.length} model{filtered.length === 1 ? "" : "s"}</span>
+              <div className="racer-picker-pane-label cn-row cn-microlabel cn-text-overlay-2" role="presentation" aria-hidden="true">
+                {activeProvider && <><HarnessLogo harness={activeProvider.id} size={14} /><strong className="cn-text-subtext-1">{activeProvider.name}</strong></>}
+                <span className="cn-auto-l">{filtered.length} model{filtered.length === 1 ? "" : "s"}</span>
               </div>
               {filtered.map((choice, index) => {
                 const isSelected = choice.provider.id === harness && choice.model.id === model;
@@ -234,8 +233,8 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
                     onClick={() => choose(choice)}
                   >
                     <span className="racer-option-logo" aria-hidden="true"><ModelLabLogo model={choice.model.id} harness={choice.provider.id} size={18} /></span>
-                    <span><strong>{choice.model.label}</strong><small>{modelLabName(choice.model.id, choice.provider.id)} · {choice.model.id}</small></span>
-                    {choice.model.isDefault && <em>DEFAULT</em>}
+                    <span className="cn-grow cn-stack cn-gap-4"><strong className="cn-truncate">{choice.model.label}</strong><small className="cn-code-meta cn-truncate">{modelLabName(choice.model.id, choice.provider.id)} · {choice.model.id}</small></span>
+                    {choice.model.isDefault && <em className="cn-microlabel cn-text-yellow">DEFAULT</em>}
                     <Check className={isSelected ? "selected" : ""} size={15} />
                   </button>
                 );

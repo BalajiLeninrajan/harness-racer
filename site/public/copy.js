@@ -4,9 +4,11 @@
 (function () {
   var btn = document.getElementById("copy");
   var cmd = document.getElementById("cmd");
+  var command = document.getElementById("command");
   var revert = null;
-  // The button's content is two SVGs, so the state has to live on the class
-  // and the tip — writing textContent here would delete the glyphs.
+  // The button's content is two SVGs, so the state lives on the command's
+  // is-copied class (the recipe swaps the glyph) and on the tip — writing
+  // textContent here would delete the glyphs.
   var LABEL = btn.getAttribute("aria-label");
 
   // navigator.clipboard needs a secure context. That covers production and
@@ -33,7 +35,7 @@
   btn.addEventListener("click", function () {
     write(btn.getAttribute("data-command")).then(
       function () {
-        btn.classList.add("done");
+        command.classList.add("is-copied");
         btn.setAttribute("data-tip", "Copied");
         btn.setAttribute("aria-label", "Copied");
       },
@@ -53,7 +55,7 @@
 
     clearTimeout(revert);
     revert = setTimeout(function () {
-      btn.classList.remove("done");
+      command.classList.remove("is-copied");
       btn.setAttribute("data-tip", "Copy");
       btn.setAttribute("aria-label", LABEL);
     }, 1800);

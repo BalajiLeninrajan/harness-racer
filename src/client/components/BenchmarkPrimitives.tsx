@@ -13,8 +13,8 @@ export function ModelMark({ harness, model }: { harness: HarnessId; model: strin
    flips it visually. `hero` is the package's headline-metric treatment. */
 export function Metric({ label, value, accent, hero }: { label: string; value: string; accent?: boolean; hero?: boolean }) {
   return (
-    <div className={`metric ${hero ? "is-hero" : ""} ${accent ? "metric-accent" : ""}`}>
-      <span>{label}</span>
+    <div className={`metric is-value-first ${hero ? "is-hero" : ""} ${accent ? "metric-accent" : ""}`}>
+      <span className="cn-microlabel">{label}</span>
       <strong>{value}</strong>
     </div>
   );
