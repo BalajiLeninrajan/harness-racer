@@ -58,7 +58,7 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
         </div>
       </div>
 
-      <div className="panel panel-body cn-mb-16" role="progressbar" aria-label="Benchmark progress" aria-valuemin={0} aria-valuemax={totalRuns || 1} aria-valuenow={completedRuns}>
+      <div className="cn-mb-16" role="progressbar" aria-label="Benchmark progress" aria-valuemin={0} aria-valuemax={totalRuns || 1} aria-valuenow={completedRuns}>
         <div className="cn-row cn-between cn-mb-8 cn-meta"><span>{completedRuns} / {totalRuns || "…"} runs complete</span><span>{totalRuns ? Math.round((completedRuns / totalRuns) * 100) : 0}%</span></div>
         <div className="progress-track" style={activeCompetitor ? { "--progress-fill": activeCompetitor.color } as CSSProperties : undefined}><span style={{ width: `${totalRuns ? Math.min(100, (completedRuns / totalRuns) * 100) : 2}%` }} /></div>
       </div>
