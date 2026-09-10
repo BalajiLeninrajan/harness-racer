@@ -54,6 +54,7 @@ Pick 2–6 harness/model pairs, choose parallel or sequential sampling, and watc
 - Cursor Agent via its persistent ACP session
 - Grok CLI via ACP (`grok agent stdio`)
 - OpenCode via its local server and SDK
+- Antigravity CLI via its stream-json print mode
 
 ## What it measures
 

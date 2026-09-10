@@ -25,6 +25,7 @@
 .harness-claudeAgent { color: var(--pink); }
 .harness-opencode { color: var(--green); }
 .harness-grok { color: var(--blue); }
+.harness-antigravity { color: var(--teal); }
 
 .brand-logo { display: block; flex: 0 0 auto; object-fit: contain; filter: invert(92%) sepia(8%) saturate(558%) hue-rotate(191deg) brightness(99%) contrast(93%); opacity: .92; }
 

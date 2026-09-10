@@ -1,6 +1,6 @@
 {
   "name": "harness-racer",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Race local coding-agent harness and model stacks by visible responsiveness and streaming speed.",
   "repository": {
     "type": "git",
@@ -38,6 +38,7 @@
     "claude",
     "cursor",
     "grok",
+    "antigravity",
     "opencode",
     "benchmark",
     "tps",

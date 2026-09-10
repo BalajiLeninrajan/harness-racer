@@ -31,6 +31,7 @@ export const HARNESS_LABELS: Record<HarnessId, string> = {
   claudeAgent: "Claude",
   opencode: "OpenCode",
   grok: "Grok",
+  antigravity: "Antigravity",
 };
 
 const COLORS = ["#cba6f7", "#94e2d5", "#f9e2af", "#89b4fa", "#fab387", "#f5c2e7"];
