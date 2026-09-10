@@ -73,9 +73,6 @@ main { display: grid; align-content: center; overflow: hidden; }
 .hero { position: relative; z-index: 2; padding: clamp(30px, 6vw, 60px) 0; }
 .hero h1 { margin: 16px 0 0; max-width: 15ch; }
 
-/* The one hard requirement, stated where the install command is. */
-.prereq { margin: 18px 0 0; max-width: 46ch; font-size: .92rem; line-height: 1.5; color: var(--subtext-0, var(--overlay-1)); }
-
 /* ── Responsive ───────────────────────────────────────────────────────────
    The design system's own breakpoints: 760 and 520. Each removes decoration
    before it removes content. */
