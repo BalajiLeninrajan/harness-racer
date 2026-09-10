@@ -88,8 +88,29 @@ describe("OpenCode adapter", () => {
     expect(create).toHaveBeenCalledWith(expect.objectContaining({
       model: { providerID: "anthropic", id: "sonnet" },
       permission: [{ permission: "*", pattern: "*", action: "deny" }],
+    }), { signal: expect.any(AbortSignal) });
+    expect(promptAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ tools: {}, parts: [{ type: "text", text: "Reply" }] }),
+      { signal: expect.any(AbortSignal) },
+    );
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("stops the server when cancelled while the session is being created", async () => {
+    const controller = new AbortController();
+    const create = vi.fn((_parameters: unknown, options?: { signal?: AbortSignal }) => new Promise((_resolve, reject) => {
+      options?.signal?.addEventListener("abort", () => reject(new Error("The request was aborted.")), { once: true });
     }));
-    expect(promptAsync).toHaveBeenCalledWith(expect.objectContaining({ tools: {}, parts: [{ type: "text", text: "Reply" }] }));
+    createClientMock.mockReturnValue({ session: { create }, event: { subscribe: vi.fn() } });
+
+    const run = openCodeAdapter.run({
+      cwd: "/tmp/project", model: "anthropic/sonnet", prompt: "Reply", signal: controller.signal,
+      onReady: vi.fn(), waitForStart: async () => {}, onDelta: vi.fn(),
+    });
+    await vi.waitFor(() => expect(create).toHaveBeenCalled());
+    controller.abort(new Error("Benchmark cancelled."));
+
+    await expect(run).rejects.toMatchObject({ name: "AbortError" });
     expect(child.kill).toHaveBeenCalledWith("SIGTERM");
   });
 

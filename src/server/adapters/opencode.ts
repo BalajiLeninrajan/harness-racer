@@ -116,8 +116,17 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
       input.onReady();
     }
   };
+  // Registered before the server is spawned, so a cancel during setup stops
+  // the SSE stream and kills the server instead of waiting for session.create.
+  const controller = new AbortController();
+  const onAbort = () => {
+    controller.abort();
+    server?.terminate();
+  };
+  input.signal.addEventListener("abort", onAbort, { once: true });
   try {
     server = await startOpenCode(input.cwd);
+    if (input.signal.aborted) throw abortError();
     const client = createOpencodeClient({ baseUrl: server.url, directory: input.cwd });
     const model = parseModelId(input.model);
     const created = await client.session.create({
@@ -125,16 +134,10 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
       title: "Harness Racer benchmark",
       model: { id: model.modelID, providerID: model.providerID },
       permission: [{ permission: "*", pattern: "*", action: "deny" }],
-    });
+    }, { signal: input.signal });
     if (!created.data) throw new Error(`OpenCode session creation failed: ${JSON.stringify(created.error)}`);
     const sessionId = created.data.id;
-    const controller = new AbortController();
     const subscription = await client.event.subscribe({ directory: input.cwd }, { signal: controller.signal });
-    const onAbort = () => {
-      controller.abort();
-      server?.terminate();
-    };
-    input.signal.addEventListener("abort", onAbort, { once: true });
     signalReady();
     await input.waitForStart();
     if (input.signal.aborted) throw abortError();
@@ -147,7 +150,7 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
         model,
         tools: {},
         parts: [{ type: "text", text: input.prompt }],
-      });
+      }, { signal: input.signal });
       if (prompt.error) throw new Error(`OpenCode prompt failed: ${JSON.stringify(prompt.error)}`);
       for await (const rawEvent of subscription.stream) {
         const event = recordFrom(rawEvent);
@@ -175,7 +178,6 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
       }
       return {};
     } finally {
-      input.signal.removeEventListener("abort", onAbort);
       controller.abort();
     }
   } catch (error) {
@@ -183,6 +185,7 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
     if (input.signal.aborted) throw abortError();
     throw error;
   } finally {
+    input.signal.removeEventListener("abort", onAbort);
     server?.terminate();
   }
 }
