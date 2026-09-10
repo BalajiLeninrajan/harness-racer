@@ -141,6 +141,19 @@ describe("Grok adapter", () => {
     expect(processes[1]?.kill).toHaveBeenCalledWith("SIGTERM");
   });
 
+  it("fails pending requests when stdin errors instead of crashing", async () => {
+    behaviour.hang = ["authenticate"];
+    const run = grokAdapter.run({
+      cwd: "/tmp/project", model: "grok-fast", prompt: "x", signal: new AbortController().signal,
+      onReady: vi.fn(), waitForStart: async () => {}, onDelta: vi.fn(),
+    });
+    await vi.waitFor(() => expect(processes[0]?.requests.at(-1)?.method).toBe("authenticate"));
+    processes[0].stdin.emit("error", new Error("write EPIPE"));
+
+    await expect(run).rejects.toThrow("write EPIPE");
+    expect(processes[0]?.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
   it("rejects an already-aborted run without spawning", async () => {
     const controller = new AbortController();
     controller.abort();

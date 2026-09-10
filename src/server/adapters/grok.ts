@@ -48,6 +48,9 @@ class GrokAcpConnection {
     this.child.stdout.on("data", (chunk: string) => this.acceptChunk(chunk));
     this.child.stderr.on("data", (chunk: string) => { this.stderr = (this.stderr + chunk).slice(-16_384); });
     this.child.once("error", (error) => this.failAll(error));
+    // A write that lands after the child closed its read end raises EPIPE on
+    // stdin; without a listener that is an uncaught exception.
+    this.child.stdin.on("error", (error) => this.failAll(error));
     this.child.once("close", (code, signal) => {
       this.closed = true;
       this.failAll(new Error(`Grok ACP exited with ${signal ? `signal ${signal}` : `code ${code}`}${this.stderr.trim() ? `: ${this.stderr.trim()}` : ""}`));
