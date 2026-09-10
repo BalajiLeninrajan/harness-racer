@@ -171,27 +171,24 @@ async function runParallel(
         // Never strand healthy racers behind the readiness barrier when one
         // process fails during setup.
         release();
+        // A cancelled lane is not a lane error; the benchmark as a whole is
+        // cancelled once every lane has settled.
+        if (!signal.aborted) {
+          emit({
+            type: "run.error",
+            competitorId: competitor.id,
+            workload: workload.id,
+            sample,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
         throw error;
       });
     });
 
   const settled = await Promise.allSettled(tasks);
-  const results: RunResult[] = [];
-  settled.forEach((outcome, index) => {
-    if (outcome.status === "fulfilled") {
-      results.push(outcome.value);
-      return;
-    }
-    const competitor = competitors[index];
-    emit({
-      type: "run.error",
-      competitorId: competitor.id,
-      workload: workload.id,
-      sample,
-      message: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
-    });
-  });
-  return results;
+  if (signal.aborted) throw signal.reason;
+  return settled.flatMap((outcome) => (outcome.status === "fulfilled" ? [outcome.value] : []));
 }
 
 async function runSequential(

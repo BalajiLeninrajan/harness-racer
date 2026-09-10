@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HarnessAdapter } from "../src/server/adapters/types.js";
 import { runBenchmark } from "../src/server/benchmark.js";
 import type { BenchmarkRequest, ServerEvent } from "../src/shared/types.js";
@@ -21,6 +21,55 @@ function fakeAdapter(id: "codex" | "cursor", delayMs: number): HarnessAdapter {
       input.onDelta(corpus.slice(middle));
       return { nativeOutputTokens: 42 };
     },
+  };
+}
+
+function corpusFrom(prompt: string): string {
+  return prompt.match(/<payload>\n([\s\S]*?)\n<\/payload>/)?.[1] ?? "";
+}
+
+function rejectOnAbort(signal: AbortSignal): Promise<never> {
+  return new Promise((_resolve, reject) => {
+    const fail = () => {
+      const error = new Error("Benchmark cancelled");
+      error.name = "AbortError";
+      reject(error);
+    };
+    if (signal.aborted) fail();
+    else signal.addEventListener("abort", fail, { once: true });
+  });
+}
+
+// Streams half the payload, then behaves like a real adapter under cancellation:
+// it rejects with its own fixed abort error once the run signal fires.
+function stallingAdapter(id: "codex" | "cursor", onStalled?: () => void): HarnessAdapter {
+  return {
+    id,
+    name: id,
+    command: id,
+    async probe() {
+      return { id, name: id, command: id, installed: true, authenticated: true, models: [] };
+    },
+    async run(input) {
+      input.onReady();
+      await input.waitForStart();
+      const corpus = corpusFrom(input.prompt);
+      input.onDelta(corpus.slice(0, Math.floor(corpus.length / 2)));
+      onStalled?.();
+      return rejectOnAbort(input.signal);
+    },
+  };
+}
+
+function parallelRequest(): BenchmarkRequest {
+  return {
+    type: "start",
+    mode: "parallel",
+    samplePreset: "quick",
+    competitors: [
+      { id: "a", harness: "codex", model: "alpha", label: "Alpha", color: "#fff" },
+      { id: "b", harness: "cursor", model: "beta", label: "Beta", color: "#000" },
+    ],
   };
 }
 
@@ -125,6 +174,9 @@ describe("benchmark engine", () => {
     const errors = events.filter((event) => event.type === "run.error");
     expect(errors).toHaveLength(2);
     expect(errors.every((event) => event.competitorId === "broken" && event.message === "setup failed")).toBe(true);
+    // The failure is reported when it happens, not after the slowest lane finishes.
+    expect(events.findIndex((event) => event.type === "run.error"))
+      .toBeLessThan(events.findIndex((event) => event.type === "run.complete"));
 
     const completed = events.find((event) => event.type === "benchmark.complete");
     expect(completed?.type).toBe("benchmark.complete");
@@ -132,6 +184,26 @@ describe("benchmark engine", () => {
     expect(completed.results).toHaveLength(2);
     expect(completed.results.every((result) => result.competitorId === "healthy" && result.valid)).toBe(true);
     expect(completed.summary.map((row) => row.competitor.id)).toEqual(["healthy"]);
+  });
+
+  it("rejects with the cancel reason when a parallel heat is cancelled", async () => {
+    const controller = new AbortController();
+    const events: ServerEvent[] = [];
+    let stalled = 0;
+    const onStalled = () => {
+      stalled += 1;
+      if (stalled === 2) controller.abort(new Error("Benchmark cancelled."));
+    };
+
+    await expect(runBenchmark(
+      parallelRequest(),
+      [stallingAdapter("codex", onStalled), stallingAdapter("cursor", onStalled)],
+      controller.signal,
+      (event) => events.push(event),
+    )).rejects.toThrow("Benchmark cancelled.");
+
+    expect(events.some((event) => event.type === "benchmark.complete")).toBe(false);
+    expect(events.filter((event) => event.type === "run.error")).toEqual([]);
   });
 
   it("continues sequential heats after one racer fails", async () => {
