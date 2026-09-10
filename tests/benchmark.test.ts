@@ -70,6 +70,38 @@ function sequentialRequest(): BenchmarkRequest {
   };
 }
 
+// Ready at once and streams the whole payload in one synchronous chunk, so a
+// test under fake timers never has to advance a timer for it.
+function instantAdapter(id: "codex" | "cursor"): HarnessAdapter {
+  return {
+    ...stallingAdapter(id),
+    async run(input) {
+      input.onReady();
+      await input.waitForStart();
+      input.onDelta(corpusFrom(input.prompt));
+      return {};
+    },
+  };
+}
+
+// Never signals ready and ignores the run signal, like a harness stuck in its
+// own setup. `runs` lets a test misbehave in the first heat only.
+function stuckAdapter(id: "codex" | "cursor", runs: { count: number }, stuckUntilRun = Infinity): HarnessAdapter {
+  const unstuck = instantAdapter(id);
+  return {
+    ...unstuck,
+    run(input) {
+      runs.count += 1;
+      if (runs.count < stuckUntilRun) return new Promise(() => {});
+      return unstuck.run(input);
+    },
+  };
+}
+
+function statusesOf(events: ServerEvent[], competitorId: string): string[] {
+  return events.flatMap((event) => (event.type === "run.status" && event.competitorId === competitorId ? [event.status] : []));
+}
+
 function parallelRequest(): BenchmarkRequest {
   return {
     type: "start",
@@ -281,6 +313,92 @@ describe("benchmark engine", () => {
 
     expect(events.some((event) => event.type === "run.complete")).toBe(false);
     expect(events.some((event) => event.type === "benchmark.complete")).toBe(false);
+  });
+
+  it("frees a lane waiting at the start barrier when the benchmark is cancelled", async () => {
+    const controller = new AbortController();
+    const events: ServerEvent[] = [];
+    const runs = { count: 0 };
+
+    const done = runBenchmark(
+      parallelRequest(),
+      [instantAdapter("codex"), stuckAdapter("cursor", runs)],
+      controller.signal,
+      (event) => events.push(event),
+    );
+    await vi.waitFor(() => expect(statusesOf(events, "a")).toContain("ready"));
+    controller.abort(new Error("Benchmark cancelled."));
+    const settled = new Promise<never>((_resolve, reject) => {
+      setTimeout(() => reject(new Error("The benchmark never settled.")), 1_000);
+    });
+
+    await expect(Promise.race([done, settled])).rejects.toThrow("Benchmark cancelled.");
+    expect(statusesOf(events, "a")).not.toContain("running");
+  });
+
+  it("gives up on a lane that is not ready within 120 seconds", async () => {
+    vi.useFakeTimers();
+    const events: ServerEvent[] = [];
+    const runs = { count: 0 };
+
+    const done = runBenchmark(
+      parallelRequest(),
+      [instantAdapter("codex"), stuckAdapter("cursor", runs, 2)],
+      new AbortController().signal,
+      (event) => events.push(event),
+    );
+    await vi.waitFor(() => expect(statusesOf(events, "a")).toContain("ready"));
+    await vi.advanceTimersByTimeAsync(120_000);
+    await done;
+
+    const errors = events.filter((event) => event.type === "run.error");
+    expect(errors.map((event) => event.competitorId).sort()).toEqual(["a", "b"]);
+    expect(errors.every((event) => event.message === "Harness was not ready to start within 120 seconds.")).toBe(true);
+    expect(events.some((event) => event.type === "benchmark.complete")).toBe(true);
+  });
+
+  it("does not charge a slow lane's setup against a fast lane's run budget", async () => {
+    vi.useFakeTimers();
+    const events: ServerEvent[] = [];
+    let runs = 0;
+    const fast: HarnessAdapter = {
+      ...stallingAdapter("codex"),
+      async run(input) {
+        runs += 1;
+        const firstHeat = runs === 1;
+        input.onReady();
+        await input.waitForStart();
+        const corpus = corpusFrom(input.prompt);
+        const middle = Math.floor(corpus.length / 2);
+        input.onDelta(corpus.slice(0, middle));
+        if (firstHeat) await new Promise((resolve) => setTimeout(resolve, 30_000));
+        input.onDelta(corpus.slice(middle));
+        return {};
+      },
+    };
+    const slowToStart: HarnessAdapter = {
+      ...stallingAdapter("cursor"),
+      async run(input) {
+        if (runs === 1) await new Promise((resolve) => setTimeout(resolve, 100_000));
+        input.onReady();
+        await input.waitForStart();
+        input.onDelta(corpusFrom(input.prompt));
+        return {};
+      },
+    };
+
+    const done = runBenchmark(parallelRequest(), [fast, slowToStart], new AbortController().signal, (event) => events.push(event));
+    await vi.waitFor(() => expect(statusesOf(events, "a")).toContain("ready"));
+    await vi.advanceTimersByTimeAsync(100_000);
+    expect(statusesOf(events, "a")).toContain("running");
+    await vi.advanceTimersByTimeAsync(30_000);
+    await done;
+
+    expect(events.filter((event) => event.type === "run.error")).toEqual([]);
+    const completed = events.find((event) => event.type === "benchmark.complete");
+    expect(completed?.type).toBe("benchmark.complete");
+    if (completed?.type !== "benchmark.complete") return;
+    expect(completed.results).toHaveLength(4);
   });
 
   it("continues sequential heats after one racer fails", async () => {

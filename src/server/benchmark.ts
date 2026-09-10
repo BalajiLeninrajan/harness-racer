@@ -22,6 +22,19 @@ const presetRuns: Record<SamplePreset, { warmups: number; measured: number }> = 
 
 type Emit = (event: ServerEvent) => void;
 
+const RUN_TIMEOUT_MS = 120_000;
+
+// Settles with the promise, or rejects with the signal's reason as soon as it
+// aborts, so nothing in runOne keeps waiting on an adapter that ignores it.
+function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
+}
+
 interface RunOneInput {
   competitor: Competitor;
   workload: (typeof workloads)[number];
@@ -37,7 +50,13 @@ interface RunOneInput {
 async function runOne(input: RunOneInput): Promise<RunResult> {
   const { competitor, workload, sample, warmup, adapter, parentSignal, emit } = input;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(new Error("Run timed out after 120 seconds.")), 120_000);
+  // One budget for setup (including the parallel start barrier) and a fresh
+  // one for the run itself, so a slow lane's prep does not eat a fast lane's
+  // run time.
+  let timeout = setTimeout(
+    () => controller.abort(new Error(`Harness was not ready to start within ${RUN_TIMEOUT_MS / 1000} seconds.`)),
+    RUN_TIMEOUT_MS,
+  );
   const abort = () => controller.abort(parentSignal.reason);
   parentSignal.addEventListener("abort", abort, { once: true });
 
@@ -53,7 +72,7 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
   emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "starting" });
 
   try {
-    const adapterResult = await adapter.run({
+    const adapterResult = await untilAborted(adapter.run({
       model: competitor.model,
       prompt: workload.prompt,
       cwd: workspace,
@@ -64,8 +83,13 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
         input.onReady?.();
       },
       waitForStart: async () => {
-        if (input.startGate) await input.startGate;
+        if (input.startGate) await untilAborted(input.startGate, controller.signal);
         startedAt = performance.now();
+        clearTimeout(timeout);
+        timeout = setTimeout(
+          () => controller.abort(new Error(`Run timed out after ${RUN_TIMEOUT_MS / 1000} seconds.`)),
+          RUN_TIMEOUT_MS,
+        );
         emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "running" });
       },
       onDelta: (text) => {
@@ -87,7 +111,7 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
           ...(deltaCount > 1 ? { liveVisibleTokensPerSecond: tokens / (visibleStreamMs / 1000) } : {}),
         });
       },
-    });
+    }), controller.signal);
 
     // An adapter can resolve after its process was cut short by the abort, so
     // a resolved run is only complete if nothing aborted it in the meantime.
