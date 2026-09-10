@@ -65,15 +65,13 @@ describe("OpenCode adapter", () => {
   it("creates a denied-permission session and emits assistant text deltas", async () => {
     const promptAsync = vi.fn().mockResolvedValue({});
     const create = vi.fn().mockResolvedValue({ data: { id: "session-1" } });
-    createClientMock.mockReturnValue({
-      session: { create, promptAsync },
-      event: { subscribe: vi.fn().mockResolvedValue({ stream: events([
-        { type: "message.updated", properties: { sessionID: "session-1", info: { id: "message-1", role: "assistant" } } },
-        { type: "message.part.updated", properties: { sessionID: "session-1", part: { id: "part-1", messageID: "message-1", type: "text", text: "hel" } } },
-        { type: "message.part.updated", properties: { sessionID: "session-1", part: { id: "part-1", messageID: "message-1", type: "text", text: "hello" } } },
-        { type: "session.idle", properties: { sessionID: "session-1" } },
-      ]) }) },
-    });
+    const subscribe = vi.fn().mockResolvedValue({ stream: events([
+      { type: "message.updated", properties: { sessionID: "session-1", info: { id: "message-1", role: "assistant" } } },
+      { type: "message.part.updated", properties: { sessionID: "session-1", part: { id: "part-1", messageID: "message-1", type: "text", text: "hel" } } },
+      { type: "message.part.updated", properties: { sessionID: "session-1", part: { id: "part-1", messageID: "message-1", type: "text", text: "hello" } } },
+      { type: "session.idle", properties: { sessionID: "session-1" } },
+    ]) });
+    createClientMock.mockReturnValue({ session: { create, promptAsync }, event: { subscribe } });
     const deltas: string[] = [];
     const onReady = vi.fn();
 
@@ -93,7 +91,60 @@ describe("OpenCode adapter", () => {
       expect.objectContaining({ tools: {}, parts: [{ type: "text", text: "Reply" }] }),
       { signal: expect.any(AbortSignal) },
     );
+    expect(subscribe).toHaveBeenCalledWith({ directory: "/tmp/project" }, { signal: expect.any(AbortSignal), sseMaxRetryAttempts: 1 });
     expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("fails when the event stream ends before the session goes idle", async () => {
+    createClientMock.mockReturnValue({
+      session: { create: vi.fn().mockResolvedValue({ data: { id: "session-1" } }), promptAsync: vi.fn().mockResolvedValue({}) },
+      event: { subscribe: vi.fn().mockResolvedValue({ stream: events([
+        { type: "message.updated", properties: { sessionID: "session-1", info: { id: "message-1", role: "assistant" } } },
+        { type: "message.part.updated", properties: { sessionID: "session-1", part: { id: "part-1", messageID: "message-1", type: "text", text: "hel" } } },
+      ]) }) },
+    });
+
+    await expect(openCodeAdapter.run({
+      cwd: "/tmp/project", model: "anthropic/sonnet", prompt: "Reply",
+      signal: new AbortController().signal, onReady: vi.fn(), waitForStart: async () => {}, onDelta: vi.fn(),
+    })).rejects.toThrow("before the session went idle");
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("escalates to SIGKILL when the server ignores SIGTERM", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      createClientMock.mockReturnValue({});
+      await expect(openCodeAdapter.run({
+        cwd: "/tmp", model: "sonnet", prompt: "x", signal: new AbortController().signal,
+        onReady: vi.fn(), waitForStart: async () => {}, onDelta: vi.fn(),
+      })).rejects.toThrow("Invalid OpenCode model id");
+      expect(child.kill).toHaveBeenCalledExactlyOnceWith("SIGTERM");
+
+      vi.advanceTimersByTime(1_499);
+      expect(child.kill).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(1);
+      expect(child.kill).toHaveBeenLastCalledWith("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not send SIGKILL to a server that exited on SIGTERM", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      child.kill.mockImplementation(() => { child.exitCode = 0; return true; });
+      createClientMock.mockReturnValue({});
+      await expect(openCodeAdapter.run({
+        cwd: "/tmp", model: "sonnet", prompt: "x", signal: new AbortController().signal,
+        onReady: vi.fn(), waitForStart: async () => {}, onDelta: vi.fn(),
+      })).rejects.toThrow("Invalid OpenCode model id");
+
+      vi.advanceTimersByTime(2_000);
+      expect(child.kill).toHaveBeenCalledExactlyOnceWith("SIGTERM");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("stops the server when cancelled while the session is being created", async () => {

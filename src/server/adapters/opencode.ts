@@ -45,8 +45,15 @@ async function startOpenCode(cwd: string): Promise<OpenCodeProcess> {
   let stderr = "";
   child.stderr.setEncoding("utf8");
   child.stderr.on("data", (chunk: string) => { stderr = (stderr + chunk).slice(-16_384); });
+  let terminating = false;
   const terminate = () => {
-    if (child.exitCode === null && child.signalCode === null) child.kill("SIGTERM");
+    if (terminating || child.exitCode !== null || child.signalCode !== null) return;
+    terminating = true;
+    child.kill("SIGTERM");
+    const timer = setTimeout(() => {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    }, 1_500);
+    timer.unref();
   };
   await new Promise<void>((resolve, reject) => {
     let attempts = 0;
@@ -137,12 +144,16 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
     }, { signal: input.signal });
     if (!created.data) throw new Error(`OpenCode session creation failed: ${JSON.stringify(created.error)}`);
     const sessionId = created.data.id;
-    const subscription = await client.event.subscribe({ directory: input.cwd }, { signal: controller.signal });
+    // The SDK counts the first connection as an attempt, so 1 means no
+    // reconnects: a server that dies ends the stream instead of being retried
+    // with backoff until the run times out.
+    const subscription = await client.event.subscribe({ directory: input.cwd }, { signal: controller.signal, sseMaxRetryAttempts: 1 });
     signalReady();
     await input.waitForStart();
     if (input.signal.aborted) throw abortError();
     const roles = new Map<string, string>();
     const emitted = new Map<string, string>();
+    let idle = false;
     try {
       const prompt = await client.session.promptAsync({
         sessionID: sessionId,
@@ -174,8 +185,13 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
           if (typeof properties.partID === "string") emitted.set(properties.partID, `${emitted.get(properties.partID) ?? ""}${properties.delta}`);
         }
         if (event?.type === "session.error") throw new Error(`OpenCode session failed: ${JSON.stringify(properties.error)}`);
-        if (event?.type === "session.idle") break;
+        if (event?.type === "session.idle") {
+          idle = true;
+          break;
+        }
       }
+      // The stream also ends cleanly on abort and when the server goes away.
+      if (!idle) throw new Error("OpenCode event stream ended before the session went idle");
       return {};
     } finally {
       controller.abort();
