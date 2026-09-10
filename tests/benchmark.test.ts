@@ -61,6 +61,15 @@ function stallingAdapter(id: "codex" | "cursor", onStalled?: () => void): Harnes
   };
 }
 
+function sequentialRequest(): BenchmarkRequest {
+  return {
+    type: "start",
+    mode: "sequential",
+    samplePreset: "quick",
+    competitors: [{ id: "a", harness: "codex", model: "alpha", label: "Alpha", color: "#fff" }],
+  };
+}
+
 function parallelRequest(): BenchmarkRequest {
   return {
     type: "start",
@@ -88,6 +97,10 @@ function failingAdapter(id: "codex" | "cursor", message: string): HarnessAdapter
 }
 
 describe("benchmark engine", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("runs both heats behind a parallel ready barrier and produces a ranking", async () => {
     const request: BenchmarkRequest = {
       type: "start",
@@ -204,6 +217,70 @@ describe("benchmark engine", () => {
 
     expect(events.some((event) => event.type === "benchmark.complete")).toBe(false);
     expect(events.filter((event) => event.type === "run.error")).toEqual([]);
+  });
+
+  it("reports the timeout reason when a run stalls for 120 seconds", async () => {
+    vi.useFakeTimers();
+    const events: ServerEvent[] = [];
+    let runs = 0;
+    let stalled!: () => void;
+    const firstRunStalled = new Promise<void>((resolve) => { stalled = resolve; });
+    const adapter: HarnessAdapter = {
+      ...stallingAdapter("codex"),
+      async run(input) {
+        runs += 1;
+        input.onReady();
+        await input.waitForStart();
+        const corpus = corpusFrom(input.prompt);
+        const middle = Math.floor(corpus.length / 2);
+        input.onDelta(corpus.slice(0, middle));
+        if (runs > 1) {
+          input.onDelta(corpus.slice(middle));
+          return {};
+        }
+        stalled();
+        return rejectOnAbort(input.signal);
+      },
+    };
+
+    const done = runBenchmark(sequentialRequest(), [adapter], new AbortController().signal, (event) => events.push(event));
+    await firstRunStalled;
+    await vi.advanceTimersByTimeAsync(120_000);
+    await done;
+
+    expect(events.filter((event) => event.type === "run.error")).toEqual([
+      expect.objectContaining({ competitorId: "a", message: "Run timed out after 120 seconds." }),
+    ]);
+    const completed = events.find((event) => event.type === "benchmark.complete");
+    expect(completed?.type).toBe("benchmark.complete");
+    if (completed?.type !== "benchmark.complete") return;
+    expect(completed.results).toHaveLength(1);
+  });
+
+  it("does not report a run complete when it was cancelled as the adapter resolved", async () => {
+    const controller = new AbortController();
+    const events: ServerEvent[] = [];
+    const adapter: HarnessAdapter = {
+      ...stallingAdapter("codex"),
+      run(input) {
+        const run = (async () => {
+          input.onReady();
+          await input.waitForStart();
+          input.onDelta(corpusFrom(input.prompt));
+          return {};
+        })();
+        // The cancel lands after the adapter settled but before the engine
+        // looks at the result.
+        void run.then(() => controller.abort(new Error("Benchmark cancelled.")));
+        return run;
+      },
+    };
+
+    await expect(runBenchmark(sequentialRequest(), [adapter], controller.signal, (event) => events.push(event)))
+      .rejects.toThrow("Benchmark cancelled.");
+
+    expect(events.some((event) => event.type === "run.complete")).toBe(false);
+    expect(events.some((event) => event.type === "benchmark.complete")).toBe(false);
   });
 
   it("continues sequential heats after one racer fails", async () => {

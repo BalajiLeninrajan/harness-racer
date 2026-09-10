@@ -89,6 +89,9 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
       },
     });
 
+    // An adapter can resolve after its process was cut short by the abort, so
+    // a resolved run is only complete if nothing aborted it in the meantime.
+    if (controller.signal.aborted) throw controller.signal.reason;
     if (firstDeltaAt === 0 || lastDeltaAt === 0) {
       throw new Error("The agent completed without streaming visible text.");
     }
@@ -129,6 +132,11 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
     emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "complete" });
     emit({ type: "run.complete", result });
     return result;
+  } catch (error) {
+    // Adapters rethrow their own fixed "cancelled" error; the reason on the
+    // signal (timeout or cancel message) is the one worth reporting.
+    if (controller.signal.aborted) throw controller.signal.reason;
+    throw error;
   } finally {
     clearTimeout(timeout);
     parentSignal.removeEventListener("abort", abort);
