@@ -5,7 +5,7 @@
 [![Node.js](https://img.shields.io/node/v/harness-racer.svg)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/BalajiLeninrajan/harness-racer/blob/main/LICENSE)
 
-Race the coding-agent stacks already installed and authenticated on your machine. Harness Racer streams every response live and compares cold-start responsiveness, time to first output, visible tokens per second, and time to finish — in a browser dashboard or entirely in your terminal.
+Race the coding-agent CLIs already installed and signed in on your machine. Harness Racer streams every response live and compares cold-start responsiveness, time to first output, visible tokens per second, and time to finish — in a browser dashboard or entirely in your terminal.
 
 It measures the experience a harness actually gives you locally. It is not a raw model API benchmark and not a model-quality evaluation. It never asks for API keys.
 
@@ -21,6 +21,18 @@ npx harness-racer --cli        # terminal UI
 ```console
 npm install -g harness-racer
 ```
+
+## Prerequisites
+
+Harness Racer only drives CLIs. Each lane needs that harness's command on `PATH`, signed in through the CLI itself. Desktop apps and editor extensions are not detected, even when they bundle the same agent, because they keep their own login. Harness Racer never installs a CLI, never runs a sign-in flow, and never asks for API keys. A harness that is missing or signed out simply does not appear in the picker.
+
+| Harness | Command on `PATH` | Sign in with |
+| --- | --- | --- |
+| Codex CLI | `codex` | `codex login` |
+| Claude Code | `claude` | `/login` inside `claude` |
+| Cursor Agent | `agent` or `cursor-agent` | `agent login` |
+| Grok CLI | `grok` | the sign-in prompt in `grok` |
+| OpenCode | `opencode` | `opencode auth login` |
 
 ## Usage
 
