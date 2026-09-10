@@ -33,6 +33,7 @@ Harness Racer only drives CLIs. Each lane needs that harness's command on `PATH`
 | Cursor Agent | `agent` or `cursor-agent` | `agent login` |
 | Grok CLI | `grok` | the sign-in prompt in `grok` |
 | OpenCode | `opencode` | `opencode auth login` |
+| Antigravity CLI | `agy` | launching `agy` with no arguments |
 
 ## Usage
 
