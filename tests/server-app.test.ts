@@ -128,6 +128,24 @@ describe("server app", () => {
     expect(JSON.parse(response.body)).toEqual({ error: "probe failed" });
   });
 
+  it("destroys upgrades from a mismatched or unparsable origin", () => {
+    const server = new EventEmitter();
+    const websocketServer = attachWebSockets(server as unknown as HttpServer);
+    const handleUpgrade = vi.spyOn(websocketServer, "handleUpgrade").mockImplementation(() => undefined);
+    const upgrade = (origin?: string) => {
+      const socket = { destroy: vi.fn() };
+      server.emit("upgrade", { url: "/ws", headers: { host: "localhost:5173", origin } }, socket, Buffer.alloc(0));
+      return socket.destroy.mock.calls.length > 0 ? "destroyed" : "upgraded";
+    };
+
+    expect(upgrade("http://localhost:5173")).toBe("upgraded");
+    expect(upgrade(undefined)).toBe("upgraded");
+    expect(upgrade("http://evil.example")).toBe("destroyed");
+    expect(upgrade("null")).toBe("destroyed");
+    expect(handleUpgrade).toHaveBeenCalledTimes(2);
+    websocketServer.close();
+  });
+
   it("rejects malformed JSON and invalid benchmark configurations", async () => {
     const server = new EventEmitter();
     const websocketServer = attachWebSockets(server as unknown as HttpServer);
