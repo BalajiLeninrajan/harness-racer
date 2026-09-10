@@ -401,6 +401,48 @@ describe("benchmark engine", () => {
     expect(completed.results).toHaveLength(4);
   });
 
+  it("counts a lane as ready once no matter how often its adapter says so", async () => {
+    const events: ServerEvent[] = [];
+    let releaseSlow!: () => void;
+    const slowReady = new Promise<void>((resolve) => { releaseSlow = resolve; });
+    const eager: HarnessAdapter = {
+      ...instantAdapter("codex"),
+      async run(input) {
+        input.onReady();
+        input.onReady();
+        await input.waitForStart();
+        input.onDelta(corpusFrom(input.prompt));
+        return {};
+      },
+    };
+    let runs = 0;
+    const slow: HarnessAdapter = {
+      ...instantAdapter("cursor"),
+      async run(input) {
+        runs += 1;
+        if (runs === 1) await slowReady;
+        input.onReady();
+        await input.waitForStart();
+        input.onDelta(corpusFrom(input.prompt));
+        return {};
+      },
+    };
+
+    const done = runBenchmark(parallelRequest(), [eager, slow], new AbortController().signal, (event) => events.push(event));
+    await vi.waitFor(() => expect(statusesOf(events, "a")).toContain("ready"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(statusesOf(events, "a")).toEqual(["starting", "ready"]);
+    releaseSlow();
+    await done;
+
+    const statuses = events.filter((event) => event.type === "run.status");
+    const firstRunning = statuses.findIndex((event) => event.status === "running");
+    const lastReady = statuses.findIndex((event) => event.competitorId === "b" && event.status === "ready");
+    expect(lastReady).toBeGreaterThan(-1);
+    expect(firstRunning).toBeGreaterThan(lastReady);
+    expect(events.some((event) => event.type === "benchmark.complete")).toBe(true);
+  });
+
   it("continues sequential heats after one racer fails", async () => {
     const request: BenchmarkRequest = {
       type: "start",

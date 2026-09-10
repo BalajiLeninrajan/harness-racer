@@ -68,6 +68,7 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
   let lastDeltaAt = 0;
   let output = "";
   let deltaCount = 0;
+  let readySignalled = false;
 
   emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "starting" });
 
@@ -78,6 +79,10 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
       cwd: workspace,
       signal: controller.signal,
       onReady: () => {
+        // A second call from an adapter must not count twice toward the
+        // parallel start barrier.
+        if (readySignalled) return;
+        readySignalled = true;
         readyAt = performance.now();
         emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "ready" });
         input.onReady?.();
