@@ -71,6 +71,12 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
   let output = "";
   let deltaCount = 0;
   let readySignalled = false;
+  let settled = false;
+  // Adapters keep running for a while after the lane gave up on them (a
+  // timed-out or cancelled child gets a grace period before SIGKILL, and
+  // every adapter signals ready from its catch block), and nothing they
+  // report then belongs to this lane, or to a benchmark started since.
+  const closed = () => settled || controller.signal.aborted;
 
   emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "starting" });
 
@@ -83,7 +89,7 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
       onReady: () => {
         // A second call from an adapter must not count twice toward the
         // parallel start barrier.
-        if (readySignalled) return;
+        if (readySignalled || closed()) return;
         readySignalled = true;
         readyAt = performance.now();
         emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "ready" });
@@ -91,6 +97,7 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
       },
       waitForStart: async () => {
         if (input.startGate) await untilAborted(input.startGate, controller.signal);
+        if (controller.signal.aborted) throw controller.signal.reason;
         startedAt = performance.now();
         clearTimeout(timeout);
         timeout = setTimeout(
@@ -100,7 +107,7 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
         emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "running" });
       },
       onDelta: (text) => {
-        if (!text) return;
+        if (!text || closed()) return;
         const now = performance.now();
         if (firstDeltaAt === 0) firstDeltaAt = now;
         lastDeltaAt = now;
@@ -169,6 +176,7 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
     if (controller.signal.aborted) throw controller.signal.reason;
     throw error;
   } finally {
+    settled = true;
     clearTimeout(timeout);
     parentSignal.removeEventListener("abort", abort);
     await rm(workspace, { recursive: true, force: true }).catch(() => undefined);

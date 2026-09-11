@@ -278,6 +278,35 @@ describe("benchmark engine", () => {
     }
   });
 
+  it("drops what an adapter reports after its lane was cancelled", async () => {
+    const controller = new AbortController();
+    const events: ServerEvent[] = [];
+    // After the cancel the adapter behaves like a real one winding down: it
+    // signals ready from its catch block and flushes output it still had.
+    const adapter: HarnessAdapter = {
+      ...stallingAdapter("codex"),
+      async run(input) {
+        input.onReady();
+        await input.waitForStart();
+        input.onDelta(corpusFrom(input.prompt).slice(0, 10));
+        queueMicrotask(() => controller.abort(new Error("Benchmark cancelled.")));
+        try {
+          return await rejectOnAbort(input.signal);
+        } catch (error) {
+          input.onDelta("late output");
+          input.onReady();
+          throw error;
+        }
+      },
+    };
+
+    await expect(runBenchmark(sequentialRequest(), [adapter], controller.signal, (event) => events.push(event)))
+      .rejects.toThrow("Benchmark cancelled.");
+
+    expect(events.filter((event) => event.type === "run.delta").map((event) => event.text)).not.toContain("late output");
+    expect(statusesOf(events, "a")).toEqual(["starting", "ready", "running"]);
+  });
+
   it("reports the timeout reason when a run stalls for 120 seconds", async () => {
     vi.useFakeTimers();
     const events: ServerEvent[] = [];
