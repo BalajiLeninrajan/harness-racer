@@ -52,9 +52,9 @@ interface RunOneInput {
 async function runOne(input: RunOneInput): Promise<RunResult> {
   const { competitor, workload, sample, warmup, adapter, parentSignal, emit } = input;
   const controller = new AbortController();
-  // One budget for setup (including the parallel start barrier) and a fresh
-  // one for the run itself, so a slow lane's prep does not eat a fast lane's
-  // run time.
+  // One budget for setup and a fresh one for the run itself, so a slow lane's
+  // prep does not eat a fast lane's run time. Neither covers the wait at the
+  // parallel start barrier: see waitForStart.
   let timeout = setTimeout(
     () => controller.abort(new Error(`Harness was not ready to start within ${RUN_TIMEOUT_MS / 1000} seconds.`)),
     RUN_TIMEOUT_MS,
@@ -96,10 +96,14 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
         input.onReady?.();
       },
       waitForStart: async () => {
+        // The barrier opens when the last lane is ready or the first lane
+        // fails, and a lane stuck in setup fails on its own setup timer, so a
+        // ready lane carries no timer of its own while it waits here. Its
+        // failure would otherwise be reported as the harness not being ready.
+        clearTimeout(timeout);
         if (input.startGate) await untilAborted(input.startGate, controller.signal);
         if (controller.signal.aborted) throw controller.signal.reason;
         startedAt = performance.now();
-        clearTimeout(timeout);
         timeout = setTimeout(
           () => controller.abort(new Error(`Run timed out after ${RUN_TIMEOUT_MS / 1000} seconds.`)),
           RUN_TIMEOUT_MS,

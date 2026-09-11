@@ -392,7 +392,7 @@ describe("benchmark engine", () => {
     expect(statusesOf(events, "a")).not.toContain("running");
   });
 
-  it("gives up on a lane that is not ready within 120 seconds", async () => {
+  it("gives up on a lane that is not ready within 120 seconds and races the rest", async () => {
     vi.useFakeTimers();
     const events: ServerEvent[] = [];
     const runs = { count: 0 };
@@ -407,10 +407,15 @@ describe("benchmark engine", () => {
     await vi.advanceTimersByTimeAsync(120_000);
     await done;
 
-    const errors = events.filter((event) => event.type === "run.error");
-    expect(errors.map((event) => event.competitorId).sort()).toEqual(["a", "b"]);
-    expect(errors.every((event) => event.message === "Harness was not ready to start within 120 seconds.")).toBe(true);
-    expect(events.some((event) => event.type === "benchmark.complete")).toBe(true);
+    // Only the stuck lane is blamed; the lane that was ready and waiting at
+    // the barrier runs once the stuck one is out of the heat.
+    expect(events.filter((event) => event.type === "run.error")).toEqual([
+      expect.objectContaining({ competitorId: "b", message: "Harness was not ready to start within 120 seconds." }),
+    ]);
+    const completed = events.find((event) => event.type === "benchmark.complete");
+    expect(completed?.type).toBe("benchmark.complete");
+    if (completed?.type !== "benchmark.complete") return;
+    expect(completed.results.map((result) => result.competitorId).sort()).toEqual(["a", "a", "b"]);
   });
 
   it("does not charge a slow lane's setup against a fast lane's run budget", async () => {
