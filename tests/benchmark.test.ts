@@ -251,6 +251,33 @@ describe("benchmark engine", () => {
     expect(events.filter((event) => event.type === "run.error")).toEqual([]);
   });
 
+  it("handles the adapter's rejection when a cancel lands while a lane sets up", async () => {
+    const controller = new AbortController();
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+    // Like every real adapter: the run fails at once when its signal is
+    // already aborted.
+    const adapter: HarnessAdapter = {
+      ...stallingAdapter("codex"),
+      async run(input) {
+        if (input.signal.aborted) throw new Error("Benchmark cancelled");
+        return stallingAdapter("codex").run(input);
+      },
+    };
+
+    try {
+      const done = runBenchmark(sequentialRequest(), [adapter], controller.signal, () => undefined);
+      // The lane is creating its workspace; the adapter has not been called yet.
+      controller.abort(new Error("Benchmark cancelled."));
+      await expect(done).rejects.toThrow("Benchmark cancelled.");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
   it("reports the timeout reason when a run stalls for 120 seconds", async () => {
     vi.useFakeTimers();
     const events: ServerEvent[] = [];

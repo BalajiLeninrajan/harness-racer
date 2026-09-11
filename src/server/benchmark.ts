@@ -27,10 +27,12 @@ const RUN_TIMEOUT_MS = 120_000;
 // Settles with the promise, or rejects with the signal's reason as soon as it
 // aborts, so nothing in runOne keeps waiting on an adapter that ignores it.
 function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) return Promise.reject(signal.reason);
   return new Promise<T>((resolve, reject) => {
     const onAbort = () => reject(signal.reason);
-    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) onAbort();
+    else signal.addEventListener("abort", onAbort, { once: true });
+    // The promise is observed even when the signal was already aborted: the
+    // caller has started the work, and its rejection must not go unhandled.
     promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
   });
 }
