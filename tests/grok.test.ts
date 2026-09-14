@@ -148,9 +148,47 @@ describe("Grok adapter", () => {
 
     // A refused handshake is not proof of a signed-out CLI, and false would
     // hide Grok in both UIs; null keeps it listed with the message.
-    expect(result).toMatchObject({ installed: true, authenticated: null, message: expect.stringContaining("initialize failed") });
+    expect(result).toMatchObject({ installed: true, authenticated: null, models: [], message: expect.stringContaining("initialize failed") });
+    // No made-up model either: the run path would only fail on it.
+    expect(result.defaultModel).toBeUndefined();
     expect(processes[1]?.requests.some((request) => request.method === "authenticate")).toBe(false);
     expect(processes[1]?.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("gives up on a handshake that stalls and reports the timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      behaviour.hang = ["session/new"];
+      const probe = grokAdapter.probe();
+      await vi.waitFor(() => expect(processes[1]?.requests.at(-1)?.method).toBe("session/new"));
+      await vi.advanceTimersByTimeAsync(20_000);
+
+      const result = await probe;
+
+      expect(result).toMatchObject({ installed: true, authenticated: null, version: "grok 1.2.3", models: [], message: "Grok ACP handshake did not finish within 20s" });
+      expect(processes[1]?.kill).toHaveBeenCalledWith("SIGTERM");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives up on a --version that never exits", async () => {
+    vi.useFakeTimers();
+    try {
+      spawnMock.mockImplementation(() => {
+        const child = new FakeProcess();
+        processes.push(child);
+        return child;
+      });
+      const probe = grokAdapter.probe();
+      await vi.advanceTimersByTimeAsync(20_000);
+
+      expect(await probe).toMatchObject({ installed: true, authenticated: null, models: [], message: "grok --version did not finish within 20s" });
+      expect(processes[0]?.kill).toHaveBeenCalledWith("SIGKILL");
+      expect(processes).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("leaves sign-in state unknown when the agent exits during the probe handshake", async () => {

@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ spawn: vi.fn() }));
 vi.mock("node:child_process", () => ({ spawn: mocks.spawn }));
@@ -52,23 +52,80 @@ describe("Cursor adapter", () => {
     vi.resetModules();
     mocks.spawn.mockReset();
   });
+  afterEach(() => vi.useRealTimers());
 
   it("falls back from agent to cursor-agent when resolving the installed command", async () => {
     mocks.spawn
       .mockImplementationOnce(() => commandProcess("", "missing", 1))
-      .mockImplementationOnce(() => commandProcess("cursor-agent 1.2\n"))
       .mockImplementationOnce(() => commandProcess("cursor-agent 1.2\n"))
       .mockImplementationOnce(() => commandProcess('{"authenticated":false}\n'));
     const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
 
     const result = await cursorAdapter.probe();
 
-    expect(mocks.spawn.mock.calls.slice(0, 2).map((call) => call.slice(0, 2))).toEqual([
+    expect(mocks.spawn.mock.calls.map((call) => call.slice(0, 2))).toEqual([
       ["agent", ["--version"]],
       ["cursor-agent", ["--version"]],
+      ["cursor-agent", ["status", "--format", "json"]],
     ]);
-    expect(result).toMatchObject({ installed: true, authenticated: false, defaultModel: "default" });
-    expect(result.models).toEqual([{ id: "default", label: "Cursor Auto (dynamic)" }]);
+    // Signed out, so no model list: nothing is invented to stand in for one.
+    expect(result).toMatchObject({ installed: true, authenticated: false, version: "cursor-agent 1.2", models: [] });
+    expect(result.defaultModel).toBeUndefined();
+  });
+
+  it("probes the model list over ACP and marks the session's current model as default", async () => {
+    mocks.spawn
+      .mockImplementationOnce(() => commandProcess("1.2\n"))
+      .mockImplementationOnce(() => commandProcess('{"loggedIn":true}\n'))
+      .mockImplementationOnce(() => acpProcess({
+        initialize: {}, authenticate: {},
+        "session/new": { sessionId: "probe-1", configOptions: [{ id: "model-picker", category: "model", currentValue: "gpt-5" }] },
+        "cursor/list_available_models": { models: [{ id: "auto", name: "Auto" }, { id: "gpt-5", name: "GPT-5" }, { id: "gpt-5", name: "GPT-5 again" }, { id: "sonnet", name: "Sonnet" }] },
+      }));
+    const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+
+    const result = await cursorAdapter.probe();
+
+    expect(result).toMatchObject({ installed: true, authenticated: true, defaultModel: "gpt-5" });
+    expect(result.models).toEqual([{ id: "gpt-5", label: "GPT-5", isDefault: true }, { id: "sonnet", label: "Sonnet" }]);
+  });
+
+  it("gives up on a model discovery that stalls and reports it in the message", async () => {
+    vi.useFakeTimers();
+    let acp!: FakeChild;
+    mocks.spawn
+      .mockImplementationOnce(() => commandProcess("1.2\n"))
+      .mockImplementationOnce(() => commandProcess('{"loggedIn":true}\n'))
+      .mockImplementationOnce(() => (acp = acpProcess({ initialize: {} }, ["authenticate"])));
+    const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+
+    const probe = cursorAdapter.probe();
+    // waitFor moves the fake clock a little on each check, so the bound is
+    // approached in two steps rather than to the exact millisecond.
+    await vi.waitFor(() => expect(acp.stdin.write).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(19_000);
+    expect(acp.kill).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    const result = await probe;
+    expect(result).toMatchObject({ installed: true, authenticated: true, models: [], message: "Cursor ACP model discovery did not finish within 20s" });
+    expect(acp.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("reports a status command that never exits instead of hanging the probe", async () => {
+    vi.useFakeTimers();
+    const stuck = acpProcess({});
+    mocks.spawn
+      .mockImplementationOnce(() => commandProcess("1.2\n"))
+      .mockImplementationOnce(() => stuck);
+    const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+
+    const probe = cursorAdapter.probe();
+    await vi.advanceTimersByTimeAsync(20_000);
+
+    const result = await probe;
+    expect(result).toMatchObject({ installed: true, authenticated: null, version: "1.2", models: [], message: "agent status --format json did not finish within 20s" });
+    expect(stuck.kill).toHaveBeenCalledWith("SIGKILL");
   });
 
   it("runs the ACP handshake, selects a concrete model, and streams matching session chunks", async () => {

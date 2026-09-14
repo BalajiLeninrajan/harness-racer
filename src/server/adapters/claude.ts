@@ -5,6 +5,9 @@ import type { Readable, Writable } from "node:stream";
 import { startup, type Query, type SpawnOptions, type WarmQuery } from "@anthropic-ai/claude-agent-sdk";
 
 import type { ModelOption } from "../../shared/types.js";
+import { recordFrom } from "./lib/json.js";
+import { normalizeModels, probeFailure } from "./lib/probe.js";
+import { runCommand } from "./lib/process.js";
 import { abortError, runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
@@ -23,6 +26,8 @@ const SCAN_OVERLAP_BYTES = 64;
 // How long the CLI gets to exit on SIGTERM before SIGKILL, the same as the
 // ACP lanes.
 const KILL_GRACE_MS = 1_500;
+// How long each of the probe's one-shot commands (--version, auth status) gets.
+const PROBE_TIMEOUT_MS = 15_000;
 
 interface ParsedModel {
   id: string;
@@ -138,30 +143,6 @@ function discoverClaudeModels(): ModelDiscovery {
   }
   discoveryCache = { key, discovery };
   return discovery;
-}
-
-interface CommandResult {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-}
-
-function runCommand(args: string[]): Promise<CommandResult> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("claude", args, { env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => { stdout += chunk; });
-    child.stderr.on("data", (chunk: string) => { stderr += chunk; });
-    child.once("error", reject);
-    child.once("close", (code) => resolve({ code, stdout, stderr }));
-  });
-}
-
-function recordFrom(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 }
 
 function claudeDelta(value: unknown): string | undefined {
@@ -300,21 +281,18 @@ export const claudeAdapter = defineAdapter({
   command: "claude",
 }, {
   async probe(): Promise<AdapterProbeResult> {
-    let version: CommandResult;
+    let version: string;
     try {
-      version = await runCommand(["--version"]);
+      const result = await runCommand("claude", ["--version"], { timeoutMs: PROBE_TIMEOUT_MS });
+      if (result.code !== 0) throw new Error(result.firstLine || `claude --version exited with code ${result.code}`);
+      version = result.firstLine;
     } catch (error) {
-      return {
-        installed: false,
-        authenticated: null,
-        models: [],
-        message: error instanceof Error ? error.message : String(error),
-      };
+      return probeFailure(error);
     }
     let authenticated: boolean | null = null;
     try {
-      const auth = await runCommand(["auth", "status", "--json"]);
-      const status = JSON.parse(auth.stdout) as Record<string, unknown>;
+      const auth = await runCommand("claude", ["auth", "status", "--json"], { timeoutMs: PROBE_TIMEOUT_MS });
+      const status = recordFrom(JSON.parse(auth.stdout)) ?? {};
       const explicit = status.loggedIn ?? status.authenticated;
       authenticated = typeof explicit === "boolean" ? explicit : auth.code === 0;
     } catch {
@@ -322,11 +300,10 @@ export const claudeAdapter = defineAdapter({
     }
     const discovery = discoverClaudeModels();
     return {
-      installed: version.code === 0,
+      installed: true,
       authenticated,
-      version: (version.stdout || version.stderr).trim().split(/\r?\n/)[0],
-      models: discovery.models.map((model) => ({ ...model })),
-      ...(discovery.models[0] ? { defaultModel: discovery.models[0].id } : {}),
+      version,
+      ...normalizeModels(discovery.models),
       ...(discovery.message ? { message: discovery.message } : {}),
     };
   },

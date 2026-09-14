@@ -95,13 +95,40 @@ describe("Antigravity adapter", () => {
       const child = new EventEmitter() as FakeChild;
       child.stdout = Object.assign(new EventEmitter(), { setEncoding: () => {} });
       child.stderr = Object.assign(new EventEmitter(), { setEncoding: () => {} });
-      queueMicrotask(() => child.emit("error", new Error("spawn agy ENOENT")));
+      queueMicrotask(() => child.emit("error", Object.assign(new Error("spawn agy ENOENT"), { code: "ENOENT" })));
       return child;
     });
     const adapter = await loadAdapter();
     const result = await adapter.probe();
     expect(result).toMatchObject({ installed: false, authenticated: null, models: [] });
     expect(result.message).toContain("ENOENT");
+  });
+
+  it("reports a CLI whose --version fails as installed but not answering", async () => {
+    mocks.spawn.mockImplementationOnce(() => commandProcess("", "agy: cannot open shared library libfoo.so\n", 127));
+    const adapter = await loadAdapter();
+    const result = await adapter.probe();
+    expect(result).toMatchObject({ installed: true, authenticated: null, models: [], message: "agy: cannot open shared library libfoo.so" });
+  });
+
+  it("kills a model listing that outlives its 60 s bound and reports the timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      // A child that never closes on its own.
+      const stuck = sessionProcess();
+      mocks.spawn
+        .mockImplementationOnce(() => commandProcess("1.1.28\n"))
+        .mockImplementationOnce(() => stuck);
+      const adapter = await loadAdapter();
+
+      const probe = adapter.probe();
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(await probe).toMatchObject({ installed: true, authenticated: null, version: "1.1.28", models: [], message: "agy models did not finish within 60s" });
+      expect(stuck.kill).toHaveBeenCalledWith("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("lists models from agy models and marks the settings model as default", async () => {

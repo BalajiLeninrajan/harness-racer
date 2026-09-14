@@ -103,6 +103,26 @@ describe("Claude adapter", () => {
     expect(result.message).toBeUndefined();
   });
 
+  it("gives up on a --version that never exits and reports it", async () => {
+    vi.useFakeTimers();
+    // Unlike commandProcess, this child never closes on its own.
+    const stuck = Object.assign(new EventEmitter(), {
+      stdout: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
+      stderr: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
+      exitCode: null as number | null,
+      signalCode: null as string | null,
+      kill: vi.fn(),
+    });
+    mocks.spawn.mockImplementationOnce(() => stuck);
+    const { claudeAdapter } = await import("../src/server/adapters/claude.js");
+
+    const probe = claudeAdapter.probe();
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    expect(await probe).toMatchObject({ installed: true, authenticated: null, models: [], message: "claude --version did not finish within 15s" });
+    expect(stuck.kill).toHaveBeenCalledWith("SIGKILL");
+  });
+
   it("reports an empty catalog when the claude executable is not on PATH", async () => {
     vi.stubEnv("PATH", "/nowhere");
     mocks.spawn

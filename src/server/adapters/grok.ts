@@ -1,27 +1,15 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
 import type { ModelOption } from "../../shared/types.js";
+import { outputTokensFrom, recordFrom, stringFrom, type JsonRecord } from "./lib/json.js";
+import { bounded, normalizeModels, probeFailure, type ModelList } from "./lib/probe.js";
+import { runCommand } from "./lib/process.js";
 import { abortError, runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
-type JsonRecord = Record<string, unknown>;
-
-function recordFrom(value: unknown): JsonRecord | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : undefined;
-}
-
-function outputTokensFrom(value: unknown): number | undefined {
-  const record = recordFrom(value);
-  if (!record) return undefined;
-  for (const candidate of [record.outputTokens, record.output_tokens]) {
-    if (typeof candidate === "number" && Number.isFinite(candidate)) return candidate;
-  }
-  for (const nested of [record.usage, record.result]) {
-    const tokens = outputTokensFrom(nested);
-    if (tokens !== undefined) return tokens;
-  }
-  return undefined;
-}
+// The --version spawn and the ACP handshake each get this long before the
+// probe gives up on them.
+const PROBE_TIMEOUT_MS = 20_000;
 
 /** An error reply from the agent to one request, as opposed to the process failing. */
 class GrokRpcError extends Error {
@@ -142,19 +130,16 @@ class GrokAcpConnection {
   }
 }
 
-function modelsFromSession(session: unknown): { models: ModelOption[]; defaultModel?: string } {
+function modelsFromSession(session: unknown): ModelList {
   const modelState = recordFrom(recordFrom(session)?.models);
   const available = Array.isArray(modelState?.availableModels) ? modelState.availableModels : [];
-  const current = typeof modelState?.currentModelId === "string" ? modelState.currentModelId : undefined;
+  const current = stringFrom(modelState?.currentModelId);
   const models = available.flatMap((value): ModelOption[] => {
     const model = recordFrom(value);
-    const id = typeof model?.modelId === "string" ? model.modelId.trim() : "";
-    if (!id) return [];
-    const label = typeof model?.name === "string" && model.name.trim() ? model.name.trim() : id;
-    return [{ id, label, ...(id === current ? { isDefault: true } : {}) }];
+    const id = stringFrom(model?.modelId);
+    return id ? [{ id, label: stringFrom(model?.name) ?? id }] : [];
   });
-  if (!models.length) models.push({ id: "grok-build", label: "Grok Build", isDefault: true });
-  return { models, defaultModel: current ?? models[0]?.id };
+  return normalizeModels(models, current);
 }
 
 async function openSession(connection: GrokAcpConnection, cwd: string, signal?: AbortSignal) {
@@ -170,10 +155,19 @@ async function openSession(connection: GrokAcpConnection, cwd: string, signal?: 
   return { session, sessionId };
 }
 
-async function discoverGrokModels(): Promise<{ models: ModelOption[]; defaultModel?: string }> {
+async function discoverGrokModels(): Promise<ModelList> {
   const connection = new GrokAcpConnection(process.cwd(), () => {});
+  const deadline = new AbortController();
   try {
-    const started = await openSession(connection, process.cwd());
+    const started = await bounded(
+      openSession(connection, process.cwd(), deadline.signal),
+      PROBE_TIMEOUT_MS,
+      `Grok ACP handshake did not finish within ${Math.round(PROBE_TIMEOUT_MS / 1000)}s`,
+      () => {
+        deadline.abort();
+        connection.terminate();
+      },
+    );
     return modelsFromSession(started.session);
   } finally {
     connection.terminate();
@@ -221,54 +215,33 @@ export const grokAdapter = defineAdapter({
   command: "grok",
 }, {
   async probe(): Promise<AdapterProbeResult> {
-    let version = "";
+    let version: string;
     try {
-      const child = spawn("grok", ["--version"], { env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"] });
-      let output = "";
-      child.stdout.setEncoding("utf8");
-      child.stderr.setEncoding("utf8");
-      child.stdout.on("data", (chunk: string) => { output += chunk; });
-      child.stderr.on("data", (chunk: string) => { output += chunk; });
-      const code = await new Promise<number | null>((resolve, reject) => {
-        child.once("error", reject);
-        child.once("close", resolve);
-      });
-      if (code !== 0) throw new Error(output.trim() || `Grok exited with code ${code}`);
-      version = output.trim().split(/\r?\n/)[0] ?? "";
+      const result = await runCommand("grok", ["--version"], { timeoutMs: PROBE_TIMEOUT_MS });
+      if (result.code !== 0) throw new Error(result.firstLine || `Grok exited with code ${result.code}`);
+      version = result.firstLine;
     } catch (error) {
-      return {
-        installed: false,
-        authenticated: null,
-        models: [],
-        message: error instanceof Error ? error.message : String(error),
-      };
+      return probeFailure(error);
     }
     try {
-      const discovery = await discoverGrokModels();
+      const listed = await discoverGrokModels();
       return {
         installed: true,
         authenticated: true,
         version,
-        models: discovery.models,
-        defaultModel: discovery.defaultModel,
+        ...listed,
+        ...(listed.models.length ? {} : { message: "Grok listed no models" }),
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
       // Only the agent's own error reply to authenticate says it is signed
       // out. A crash, a stall, or a refused initialize says nothing certain
       // about sign-in, and false would hide Grok from both UIs on a
-      // transient failure.
+      // transient failure. Either way there is no model list to offer: a
+      // made-up one would only send the user into a lane that fails.
       if (error instanceof GrokRpcError && error.method === "authenticate") {
-        return { installed: true, authenticated: false, version, models: [], message };
+        return { installed: true, authenticated: false, version, models: [], message: error.message };
       }
-      return {
-        installed: true,
-        authenticated: null,
-        version,
-        models: [{ id: "grok-build", label: "Grok Build", isDefault: true }],
-        defaultModel: "grok-build",
-        message,
-      };
+      return probeFailure(error, version);
     }
   },
 

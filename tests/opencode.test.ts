@@ -62,6 +62,43 @@ describe("OpenCode adapter", () => {
     });
   });
 
+  it("stops the server and reports a provider listing that stalls", async () => {
+    vi.useFakeTimers();
+    try {
+      const list = vi.fn((_parameters: unknown, options: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+        options.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      }));
+      createClientMock.mockReturnValue({ provider: { list } });
+      // The first spawn is --version, the second the server, alive until told otherwise.
+      const server = new FakeChild();
+      spawnMock.mockReset().mockReturnValueOnce(child).mockReturnValue(server);
+      queueMicrotask(() => { child.stdout.emit("data", "opencode 2.0\n"); child.exitCode = 0; child.emit("close", 0); });
+
+      const probe = openCodeAdapter.probe();
+      // The server is polled every 100 ms until it answers; then the listing hangs.
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.waitFor(() => expect(list).toHaveBeenCalledWith({ directory: expect.any(String) }, { signal: expect.any(AbortSignal) }));
+      await vi.advanceTimersByTimeAsync(20_000);
+
+      expect(await probe).toMatchObject({ installed: true, authenticated: false, version: "opencode 2.0", models: [], message: "OpenCode provider listing did not finish within 20s" });
+      expect(server.kill).toHaveBeenCalledWith("SIGTERM");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives up on a --version that never exits", async () => {
+    vi.useFakeTimers();
+    try {
+      const probe = openCodeAdapter.probe();
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(await probe).toMatchObject({ installed: true, authenticated: null, models: [], message: "opencode --version did not finish within 20s" });
+      expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("creates a denied-permission session and emits assistant text deltas", async () => {
     const promptAsync = vi.fn().mockResolvedValue({});
     const create = vi.fn().mockResolvedValue({ data: { id: "session-1" } });

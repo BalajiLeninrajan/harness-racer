@@ -4,6 +4,9 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 import type { ModelOption } from "../../shared/types.js";
+import { recordFrom, stringFrom, stripAnsi, type JsonRecord } from "./lib/json.js";
+import { normalizeModels, probeFailure } from "./lib/probe.js";
+import { runCommand, type CommandResult } from "./lib/process.js";
 import { runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
@@ -16,44 +19,9 @@ import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type Adap
 // developer actually installs and logs into, which is what Harness Racer measures.
 const COMMAND = "agy";
 const READY_EVENT = { event: "harness-racer/ready" };
+const VERSION_TIMEOUT_MS = 15_000;
+// `agy models` fetches the list from Google's backend and is slow to answer.
 const MODELS_TIMEOUT_MS = 60_000;
-
-type JsonRecord = Record<string, unknown>;
-
-function recordFrom(value: unknown): JsonRecord | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : undefined;
-}
-
-function stripAnsi(value: string): string {
-  return value.replace(/\[[0-?]*[ -/]*[@-~]/g, "");
-}
-
-interface CommandResult {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-}
-
-function runCommand(args: string[], timeoutMs?: number): Promise<CommandResult> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(COMMAND, args, { env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => { stdout += chunk; });
-    child.stderr.on("data", (chunk: string) => { stderr += chunk; });
-    const timer = timeoutMs === undefined
-      ? undefined
-      : setTimeout(() => {
-        child.kill("SIGKILL");
-        reject(new Error(`${COMMAND} ${args.join(" ")} did not finish within ${Math.round(timeoutMs / 1000)}s`));
-      }, timeoutMs);
-    timer?.unref();
-    child.once("error", (error) => { clearTimeout(timer); reject(error); });
-    child.once("close", (code) => { clearTimeout(timer); resolve({ code, stdout, stderr }); });
-  });
-}
 
 /** `agy models` prints one `<id>\t<label>` line per model on stdout. */
 export function parseModelList(stdout: string): ModelOption[] {
@@ -70,7 +38,7 @@ export function parseModelList(stdout: string): ModelOption[] {
 function preferredModelLabel(): string | undefined {
   try {
     const settings = recordFrom(JSON.parse(readFileSync(path.join(homedir(), ".gemini", "antigravity-cli", "settings.json"), "utf8")));
-    return typeof settings?.model === "string" && settings.model.trim() ? settings.model.trim() : undefined;
+    return stringFrom(settings?.model);
   } catch {
     return undefined;
   }
@@ -219,23 +187,18 @@ export const antigravityAdapter = defineAdapter({
   async probe(): Promise<AdapterProbeResult> {
     let version: string;
     try {
-      const result = await runCommand(["--version"]);
+      const result = await runCommand(COMMAND, ["--version"], { timeoutMs: VERSION_TIMEOUT_MS });
       if (result.code !== 0) throw new Error(stripAnsi(result.stderr || result.stdout).trim() || `${COMMAND} exited with code ${result.code}`);
-      version = stripAnsi(result.stdout || result.stderr).trim().split(/\r?\n/)[0] ?? "";
+      version = result.firstLine;
     } catch (error) {
-      return {
-        installed: false,
-        authenticated: null,
-        models: [],
-        message: error instanceof Error ? error.message : String(error),
-      };
+      return probeFailure(error);
     }
 
     let listing: CommandResult;
     try {
-      listing = await runCommand(["models"], MODELS_TIMEOUT_MS);
+      listing = await runCommand(COMMAND, ["models"], { timeoutMs: MODELS_TIMEOUT_MS });
     } catch (error) {
-      return { installed: true, authenticated: null, version, models: [], message: error instanceof Error ? error.message : String(error) };
+      return probeFailure(error, version);
     }
     const models = listing.code === 0 ? parseModelList(listing.stdout) : [];
     const noise = stripAnsi(`${listing.stderr}\n${listing.stdout}`).split(/\r?\n/).filter((line) => line.trim() && !/^Fetching available models/i.test(line) && !/^\S+\t/.test(line)).join(" ").trim();
@@ -249,13 +212,12 @@ export const antigravityAdapter = defineAdapter({
       };
     }
     const preferred = preferredModelLabel();
-    const defaultModel = models.find((model) => model.label === preferred || model.id === preferred)?.id ?? models[0]!.id;
+    const preferredId = models.find((model) => model.label === preferred || model.id === preferred)?.id;
     return {
       installed: true,
       authenticated: true,
       version,
-      models: models.map((model) => ({ ...model, ...(model.id === defaultModel ? { isDefault: true } : {}) })),
-      defaultModel,
+      ...normalizeModels(models, preferredId),
     };
   },
 
