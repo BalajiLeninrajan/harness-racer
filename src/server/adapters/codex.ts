@@ -387,7 +387,7 @@ async function inspectCodex(cwd: string): Promise<InspectionResult> {
 
 async function readVersion(): Promise<string> {
   const result = await runCommand(COMMAND, ["--version"], { timeoutMs: VERSION_TIMEOUT_MS });
-  if (result.code !== 0) throw new Error(result.firstLine || `${COMMAND} --version exited with code ${result.code}`);
+  if (result.code !== 0) throw new Error(result.output || `${COMMAND} --version exited with code ${result.code}`);
   return result.firstLine.replace(/^codex-cli\s+/i, "") || result.firstLine;
 }
 

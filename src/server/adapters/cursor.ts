@@ -32,7 +32,7 @@ async function resolveCursorCommand(): Promise<{ command: string; version: strin
         resolvedCommand = candidate;
         return { command: candidate, version: result.firstLine };
       }
-      lastError = new Error(`${candidate} --version exited with code ${result.code}${result.firstLine ? `: ${result.firstLine}` : ""}`);
+      lastError = new Error(`${candidate} --version exited with code ${result.code}${result.output ? `: ${result.output}` : ""}`);
     } catch (error) {
       if (!notInstalled(error) || lastError === undefined) lastError = error;
     }

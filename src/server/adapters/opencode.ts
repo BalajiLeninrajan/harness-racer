@@ -240,7 +240,7 @@ export const openCodeAdapter = defineAdapter({
     let version: string;
     try {
       const result = await runCommand("opencode", ["--version"], { timeoutMs: PROBE_TIMEOUT_MS });
-      if (result.code !== 0) throw new Error(result.firstLine || `OpenCode exited with code ${result.code}`);
+      if (result.code !== 0) throw new Error(result.output || `opencode --version exited with code ${result.code}`);
       version = result.firstLine;
     } catch (error) {
       return probeFailure(error);

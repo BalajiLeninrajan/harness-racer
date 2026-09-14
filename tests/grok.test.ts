@@ -187,6 +187,25 @@ describe("Grok adapter", () => {
     }
   });
 
+  it("reports the whole --version output when it fails, not the banner on its first line", async () => {
+    spawnMock.mockImplementation(() => {
+      const child = new FakeProcess();
+      processes.push(child);
+      queueMicrotask(() => {
+        child.stdout.emit("data", "grok banner\n");
+        child.stderr.emit("data", "node:internal/modules/cjs/loader:1228\n  throw err;\n\nError: Cannot find module 'left-pad'\n");
+        child.exitCode = 1;
+        child.emit("close", 1, null);
+      });
+      return child;
+    });
+
+    const result = await grokAdapter.probe();
+
+    expect(result).toMatchObject({ installed: true, authenticated: null, models: [], message: "node:internal/modules/cjs/loader:1228\n  throw err;\n\nError: Cannot find module 'left-pad'\ngrok banner" });
+    expect(processes).toHaveLength(1);
+  });
+
   it("gives up on a --version that never exits", async () => {
     vi.useFakeTimers();
     try {

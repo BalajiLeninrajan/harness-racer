@@ -99,6 +99,17 @@ describe("Cursor adapter", () => {
     expect(result).toMatchObject({ installed: true, authenticated: null, models: [], message: "agent --version exited with code 2: agent: license check failed" });
   });
 
+  it("reports the whole --version output when it fails, not just its first line", async () => {
+    mocks.spawn
+      .mockImplementationOnce(() => commandProcess("agent banner\n", "node:internal/modules/cjs/loader:1228\n  throw err;\n\nError: Cannot find module 'left-pad'\n", 1))
+      .mockImplementationOnce(() => missingProcess("cursor-agent"));
+    const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+
+    const result = await cursorAdapter.probe();
+
+    expect(result.message).toBe("agent --version exited with code 1: node:internal/modules/cjs/loader:1228\n  throw err;\n\nError: Cannot find module 'left-pad'\nagent banner");
+  });
+
   it("reports not installed only when every candidate is missing from PATH", async () => {
     mocks.spawn.mockImplementation((command: string) => missingProcess(command));
     const { cursorAdapter } = await import("../src/server/adapters/cursor.js");

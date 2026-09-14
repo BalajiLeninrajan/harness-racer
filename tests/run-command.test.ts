@@ -24,7 +24,7 @@ describe("runCommand", () => {
   beforeEach(() => mocks.spawn.mockReset());
   afterEach(() => vi.useRealTimers());
 
-  it("collects both streams and picks the first non-blank line, ANSI stripped, as the version line", async () => {
+  it("collects both streams, picks the first non-blank stdout line as the version line, and joins both for the output", async () => {
     const process = child();
     mocks.spawn.mockReturnValueOnce(process);
 
@@ -39,6 +39,8 @@ describe("runCommand", () => {
       stdout: "\n\u001b[32mtool 1.2\u001b[0m\nbuild abc\n",
       stderr: "warning\n",
       firstLine: "tool 1.2",
+      // stderr first: that is where the error goes when stdout holds a banner.
+      output: "warning\ntool 1.2\nbuild abc",
     });
     expect(mocks.spawn).toHaveBeenCalledWith("tool", ["--version"], expect.objectContaining({ cwd: "/tmp/run", shell: false, stdio: ["ignore", "pipe", "pipe"] }));
   });
@@ -49,7 +51,20 @@ describe("runCommand", () => {
     const result = runCommand("tool", ["--version"]);
     process.stderr.emit("data", "tool: not signed in\n");
     process.emit("close", 1, null);
-    await expect(result).resolves.toMatchObject({ code: 1, firstLine: "tool: not signed in" });
+    await expect(result).resolves.toMatchObject({ code: 1, firstLine: "tool: not signed in", output: "tool: not signed in" });
+  });
+
+  it("keeps a multi-line failure whole in the output where the first line would drop the reason", async () => {
+    const process = child();
+    mocks.spawn.mockReturnValueOnce(process);
+    const result = runCommand("tool", ["--version"]);
+    process.stdout.emit("data", "tool banner\n");
+    process.stderr.emit("data", "node:internal/modules/cjs/loader:1228\n  throw err;\n\nError: Cannot find module 'left-pad'\n");
+    process.emit("close", 1, null);
+    await expect(result).resolves.toMatchObject({
+      firstLine: "tool banner",
+      output: "node:internal/modules/cjs/loader:1228\n  throw err;\n\nError: Cannot find module 'left-pad'\ntool banner",
+    });
   });
 
   it("rejects with the spawn error when the command cannot start", async () => {

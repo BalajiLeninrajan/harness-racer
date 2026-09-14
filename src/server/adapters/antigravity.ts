@@ -188,7 +188,7 @@ export const antigravityAdapter = defineAdapter({
     let version: string;
     try {
       const result = await runCommand(COMMAND, ["--version"], { timeoutMs: VERSION_TIMEOUT_MS });
-      if (result.code !== 0) throw new Error(stripAnsi(result.stderr || result.stdout).trim() || `${COMMAND} exited with code ${result.code}`);
+      if (result.code !== 0) throw new Error(result.output || `${COMMAND} --version exited with code ${result.code}`);
       version = result.firstLine;
     } catch (error) {
       return probeFailure(error);

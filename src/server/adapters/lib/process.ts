@@ -9,6 +9,12 @@ export interface CommandResult {
   stderr: string;
   /** The first non-blank line of stdout, or of stderr when stdout is empty, with ANSI codes removed. */
   firstLine: string;
+  /**
+   * Everything the command wrote, stderr first, ANSI stripped and trimmed.
+   * The failure message: a CLI that prints a banner on stdout and the error
+   * on stderr, or a multi-line stack, is only readable whole.
+   */
+  output: string;
 }
 
 export interface RunCommandOptions {
@@ -68,7 +74,13 @@ export function runCommand(command: string, args: string[], options: RunCommandO
     child.stdout.on("data", (chunk: string) => { stdout += chunk; });
     child.stderr.on("data", (chunk: string) => { stderr += chunk; });
     child.once("error", (error) => finish(() => reject(error)));
-    child.once("close", (code) => finish(() => resolve({ code, stdout, stderr, firstLine: firstLineOf(stdout, stderr) })));
+    child.once("close", (code) => finish(() => resolve({
+      code,
+      stdout,
+      stderr,
+      firstLine: firstLineOf(stdout, stderr),
+      output: [stderr, stdout].map((stream) => stripAnsi(stream).trim()).filter(Boolean).join("\n"),
+    })));
   });
 }
 
