@@ -12,7 +12,10 @@ import type { HarnessId, ProviderInfo } from "../../shared/types.js";
  *    parallel start barrier on rejection by itself, and a ready status right
  *    before an error would be measured as harness prep for a failed lane.
  * 3. Await `waitForStart` raced against `signal`, with no timeout of the
- *    adapter's own: the engine times the wait.
+ *    adapter's own. The wait itself is unbounded by design. The barrier
+ *    opens when the last lane is ready or the first lane fails, and a lane
+ *    stuck in setup fails on its own setup timer, so a ready lane only ever
+ *    waits on lanes that are still on the clock.
  * 4. Send `prompt`, streaming visible text through `onDelta`. Resolve once
  *    the turn is over, with the harness's own token count if it reports one.
  * 5. Reject with an AbortError once `signal` has fired, even if the prompt
