@@ -501,7 +501,8 @@ describe("benchmark engine", () => {
         const corpus = corpusFrom(input.prompt);
         const middle = Math.floor(corpus.length / 2);
         input.onDelta(corpus.slice(0, middle));
-        if (firstHeat) await new Promise((resolve) => setTimeout(resolve, 30_000));
+        // Like a real adapter, the wait ends early if the lane is given up on.
+        if (firstHeat) await Promise.race([new Promise((resolve) => setTimeout(resolve, 30_000)), rejectOnAbort(input.signal)]);
         input.onDelta(corpus.slice(middle));
         return {};
       },
