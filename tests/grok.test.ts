@@ -5,7 +5,7 @@ const { spawnMock, processes, behaviour } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
   processes: [] as FakeProcess[],
   // Requests the fake agent leaves unanswered or answers with an error.
-  behaviour: { hang: [] as string[], fail: [] as string[] },
+  behaviour: { hang: [] as string[], fail: [] as string[], currentModelId: "grok-fast" },
 }));
 
 vi.mock("node:child_process", () => ({ spawn: spawnMock }));
@@ -35,7 +35,7 @@ class FakeProcess extends EventEmitter {
         result = {
           sessionId: "session-1",
           models: {
-            currentModelId: "grok-fast",
+            currentModelId: behaviour.currentModelId,
             availableModels: [
               { modelId: "grok-fast", name: "Grok Fast" },
               { modelId: "grok-build", name: "Grok Build" },
@@ -66,6 +66,7 @@ describe("Grok adapter", () => {
     processes.length = 0;
     behaviour.hang = [];
     behaviour.fail = [];
+    behaviour.currentModelId = "grok-fast";
     spawnMock.mockReset();
     spawnMock.mockImplementation((_command: string, args: string[]) => {
       const child = new FakeProcess();
@@ -93,6 +94,20 @@ describe("Grok adapter", () => {
       ],
     });
     expect(spawnMock).toHaveBeenCalledWith("grok", ["agent", "stdio"], expect.objectContaining({ shell: false }));
+  });
+
+  it("picks a listed model when the session's current model is not among the available ones", async () => {
+    behaviour.currentModelId = "gone";
+
+    const result = await grokAdapter.probe();
+
+    // A default the run path would refuse is worse than none; the first
+    // listed model stands in and is the only one flagged.
+    expect(result).toMatchObject({ installed: true, authenticated: true, defaultModel: "grok-fast" });
+    expect(result.models).toEqual([
+      { id: "grok-fast", label: "Grok Fast", isDefault: true },
+      { id: "grok-build", label: "Grok Build" },
+    ]);
   });
 
   it("streams ACP text, switches models, and reports native token usage", async () => {
@@ -148,9 +163,68 @@ describe("Grok adapter", () => {
 
     // A refused handshake is not proof of a signed-out CLI, and false would
     // hide Grok in both UIs; null keeps it listed with the message.
-    expect(result).toMatchObject({ installed: true, authenticated: null, message: expect.stringContaining("initialize failed") });
+    expect(result).toMatchObject({ installed: true, authenticated: null, models: [], message: expect.stringContaining("initialize failed") });
+    // No made-up model either: the run path would only fail on it.
+    expect(result.defaultModel).toBeUndefined();
     expect(processes[1]?.requests.some((request) => request.method === "authenticate")).toBe(false);
     expect(processes[1]?.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("gives up on a handshake that stalls and reports the timeout with what the agent said", async () => {
+    vi.useFakeTimers();
+    try {
+      behaviour.hang = ["session/new"];
+      const probe = grokAdapter.probe();
+      await vi.waitFor(() => expect(processes[1]?.requests.at(-1)?.method).toBe("session/new"));
+      // The stall's only explanation is on stderr; a bare timeout would hide it.
+      processes[1].stderr.emit("data", "\u001b[33mOpen https://accounts.x.ai/login to sign in\u001b[0m\n");
+      await vi.advanceTimersByTimeAsync(20_000);
+
+      const result = await probe;
+
+      expect(result).toMatchObject({ installed: true, authenticated: null, version: "grok 1.2.3", models: [], message: "Grok ACP handshake did not finish within 20s: Open https://accounts.x.ai/login to sign in" });
+      expect(processes[1]?.kill).toHaveBeenCalledWith("SIGTERM");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports the whole --version output when it fails, not the banner on its first line", async () => {
+    spawnMock.mockImplementation(() => {
+      const child = new FakeProcess();
+      processes.push(child);
+      queueMicrotask(() => {
+        child.stdout.emit("data", "grok banner\n");
+        child.stderr.emit("data", "node:internal/modules/cjs/loader:1228\n  throw err;\n\nError: Cannot find module 'left-pad'\n");
+        child.exitCode = 1;
+        child.emit("close", 1, null);
+      });
+      return child;
+    });
+
+    const result = await grokAdapter.probe();
+
+    expect(result).toMatchObject({ installed: true, authenticated: null, models: [], message: "node:internal/modules/cjs/loader:1228\n  throw err;\n\nError: Cannot find module 'left-pad'\ngrok banner" });
+    expect(processes).toHaveLength(1);
+  });
+
+  it("gives up on a --version that never exits", async () => {
+    vi.useFakeTimers();
+    try {
+      spawnMock.mockImplementation(() => {
+        const child = new FakeProcess();
+        processes.push(child);
+        return child;
+      });
+      const probe = grokAdapter.probe();
+      await vi.advanceTimersByTimeAsync(20_000);
+
+      expect(await probe).toMatchObject({ installed: true, authenticated: null, models: [], message: "grok --version did not finish within 20s" });
+      expect(processes[0]?.kill).toHaveBeenCalledWith("SIGKILL");
+      expect(processes).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("leaves sign-in state unknown when the agent exits during the probe handshake", async () => {

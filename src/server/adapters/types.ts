@@ -1,4 +1,5 @@
 import type { HarnessId, ProviderInfo } from "../../shared/types.js";
+import { errorMessage } from "./lib/json.js";
 
 /**
  * What the engine hands an adapter's run(), and what it expects back. Every
@@ -47,6 +48,12 @@ export interface HarnessAdapter<Id extends HarnessId = HarnessId> {
   readonly id: Id;
   readonly name: string;
   readonly command: string;
+  /**
+   * Reads what is installed, signed in and available to race, within a bound
+   * the adapter sets. Never rejects: a probe that throws is reported as an
+   * uninstalled harness carrying the error, so one harness cannot take the
+   * whole provider list down with it.
+   */
   probe(): Promise<ProviderInfo>;
   run(input: AdapterRunInput): Promise<AdapterRunOutput>;
 }
@@ -64,7 +71,11 @@ export function defineAdapter<const Id extends HarnessId>(
     ...metadata,
     run: implementation.run,
     async probe() {
-      return { ...(await implementation.probe()), ...metadata };
+      try {
+        return { ...(await implementation.probe()), ...metadata };
+      } catch (error) {
+        return { ...metadata, installed: false, authenticated: null, models: [], message: errorMessage(error) };
+      }
     },
   };
 }

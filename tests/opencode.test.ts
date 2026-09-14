@@ -62,6 +62,97 @@ describe("OpenCode adapter", () => {
     });
   });
 
+  it("picks a listed model when the configured default names one no connected provider offers", async () => {
+    createClientMock.mockReturnValue({ provider: { list: vi.fn().mockResolvedValue({ data: {
+      connected: ["anthropic"],
+      all: [
+        { id: "anthropic", models: { sonnet: { id: "sonnet", name: "Sonnet" }, haiku: { id: "haiku", name: "Haiku" } } },
+        { id: "openai", models: { gpt: { id: "gpt", name: "GPT" } } },
+      ],
+      default: { openai: "gpt", anthropic: "gone" },
+    } }) } });
+    queueMicrotask(() => { child.stdout.emit("data", "opencode 2.0\n"); child.exitCode = 0; child.emit("close", 0); });
+
+    const result = await openCodeAdapter.probe();
+
+    expect(result).toMatchObject({ installed: true, authenticated: true, defaultModel: "anthropic/sonnet" });
+    expect(result.models).toEqual([
+      { id: "anthropic/sonnet", label: "Sonnet", isDefault: true },
+      { id: "anthropic/haiku", label: "Haiku" },
+    ]);
+  });
+
+  it("reports signed out when the listing succeeds with no connected provider", async () => {
+    createClientMock.mockReturnValue({ provider: { list: vi.fn().mockResolvedValue({ data: {
+      connected: [],
+      all: [{ id: "anthropic", models: { sonnet: { id: "sonnet", name: "Sonnet" } } }],
+      default: { anthropic: "sonnet" },
+    } }) } });
+    queueMicrotask(() => { child.stdout.emit("data", "opencode 2.0\n"); child.exitCode = 0; child.emit("close", 0); });
+
+    const result = await openCodeAdapter.probe();
+
+    expect(result).toMatchObject({ installed: true, authenticated: false, version: "opencode 2.0", models: [] });
+    expect(result.defaultModel).toBeUndefined();
+  });
+
+  it("leaves sign-in state unknown when the server does not start", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")));
+      const server = new FakeChild();
+      spawnMock.mockReset().mockReturnValueOnce(child).mockReturnValue(server);
+      queueMicrotask(() => { child.stdout.emit("data", "opencode 2.0\n"); child.exitCode = 0; child.emit("close", 0); });
+
+      const probe = openCodeAdapter.probe();
+      await vi.advanceTimersByTimeAsync(5_100);
+
+      expect(await probe).toMatchObject({ installed: true, authenticated: null, version: "opencode 2.0", models: [], message: "OpenCode server did not start" });
+      expect(server.kill).toHaveBeenCalledWith("SIGTERM");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops the server and reports a provider listing that stalls", async () => {
+    vi.useFakeTimers();
+    try {
+      const list = vi.fn((_parameters: unknown, options: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+        options.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      }));
+      createClientMock.mockReturnValue({ provider: { list } });
+      // The first spawn is --version, the second the server, alive until told otherwise.
+      const server = new FakeChild();
+      spawnMock.mockReset().mockReturnValueOnce(child).mockReturnValue(server);
+      queueMicrotask(() => { child.stdout.emit("data", "opencode 2.0\n"); child.exitCode = 0; child.emit("close", 0); });
+
+      const probe = openCodeAdapter.probe();
+      // The server is polled every 100 ms until it answers; then the listing hangs.
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.waitFor(() => expect(list).toHaveBeenCalledWith({ directory: expect.any(String) }, { signal: expect.any(AbortSignal) }));
+      await vi.advanceTimersByTimeAsync(20_000);
+
+      // A stalled listing is not the CLI saying it is signed out; false
+      // would hide OpenCode from both clients.
+      expect(await probe).toMatchObject({ installed: true, authenticated: null, version: "opencode 2.0", models: [], message: "OpenCode provider listing did not finish within 20s" });
+      expect(server.kill).toHaveBeenCalledWith("SIGTERM");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives up on a --version that never exits", async () => {
+    vi.useFakeTimers();
+    try {
+      const probe = openCodeAdapter.probe();
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(await probe).toMatchObject({ installed: true, authenticated: null, models: [], message: "opencode --version did not finish within 20s" });
+      expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("creates a denied-permission session and emits assistant text deltas", async () => {
     const promptAsync = vi.fn().mockResolvedValue({});
     const create = vi.fn().mockResolvedValue({ data: { id: "session-1" } });

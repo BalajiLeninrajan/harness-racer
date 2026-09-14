@@ -20,6 +20,8 @@ export interface ProviderInfo {
   id: HarnessId;
   name: string;
   command: string;
+  // false only when the CLI is not on PATH. One that is there but crashes,
+  // times out or exits non-zero is installed, with the failure in `message`.
   installed: boolean;
   // true: signed in. false: the CLI itself reported signed out, which hides the
   // harness. null: unknown (a probe step failed or the CLI does not say); still runnable.
