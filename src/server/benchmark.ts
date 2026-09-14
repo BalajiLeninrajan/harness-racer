@@ -25,7 +25,9 @@ type Emit = (event: ServerEvent) => void;
 
 const RUN_TIMEOUT_MS = 120_000;
 // Long enough for every adapter to have sent SIGKILL to a child that ignored
-// SIGTERM (Codex: up to 800 ms interrupt, then 1 s; the rest: 1.5 s).
+// SIGTERM (Codex: up to 800 ms interrupt, then 1 s; Claude, which spawns the
+// CLI itself rather than leaving the kill to the SDK's 2 s + 5 s close, and
+// the ACP lanes: 1.5 s).
 const TEARDOWN_GRACE_MS = 2_000;
 
 interface RunOneInput {

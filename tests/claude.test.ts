@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn(),
@@ -55,8 +55,30 @@ function runInput(signal = new AbortController().signal) {
   };
 }
 
+// The CLI process the adapter spawns for the SDK: alive until a test says
+// otherwise, and recording the signals it is sent.
+function cliProcess() {
+  return Object.assign(new EventEmitter(), {
+    stdin: new EventEmitter(),
+    stdout: new EventEmitter(),
+    kill: vi.fn(),
+    exitCode: null as number | null,
+    signalCode: null as string | null,
+  });
+}
+
+// Like the SDK: spawns the CLI through the adapter's hook, then hands back
+// the warm query once the handshake would have completed.
+function startupThatSpawns(warm: unknown) {
+  return async ({ options }: { options: { cwd: string; spawnClaudeCodeProcess: (spawn: object) => unknown } }) => {
+    options.spawnClaudeCodeProcess({ command: "/opt/claude", args: ["--output-format", "stream-json"], cwd: options.cwd, env: {} });
+    return warm;
+  };
+}
+
 describe("Claude adapter", () => {
   beforeEach(() => vi.clearAllMocks());
+  afterEach(() => vi.useRealTimers());
 
   it("probes version, authentication, and the models the installed executable recognizes", async () => {
     vi.stubEnv("PATH", "/fake/bin");
@@ -143,6 +165,49 @@ describe("Claude adapter", () => {
       }),
     });
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("spawns the CLI itself and kills it at teardown instead of waiting on the SDK's close", async () => {
+    vi.useFakeTimers();
+    const child = cliProcess();
+    mocks.spawn.mockReturnValueOnce(child);
+    const { warm, close } = warmQuery(async function* () {
+      yield { type: "result", usage: { output_tokens: 1 } };
+    });
+    mocks.startup.mockImplementation(startupThatSpawns(warm));
+    const { claudeAdapter } = await import("../src/server/adapters/claude.js");
+
+    await claudeAdapter.run(runInput());
+
+    expect(mocks.spawn).toHaveBeenCalledWith(
+      "/opt/claude",
+      ["--output-format", "stream-json"],
+      expect.objectContaining({ cwd: "/tmp/project", stdio: ["pipe", "pipe", "ignore"] }),
+    );
+    // The SDK is closed first, then the process is signalled at once: the
+    // SDK's own close would not send SIGTERM for 2 s.
+    expect(close).toHaveBeenCalledOnce();
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(child.kill).not.toHaveBeenCalledWith("SIGKILL");
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+  });
+
+  it("does not follow SIGTERM with SIGKILL once the CLI has exited", async () => {
+    vi.useFakeTimers();
+    const child = cliProcess();
+    child.kill.mockImplementation(() => { child.signalCode = "SIGTERM"; return true; });
+    mocks.spawn.mockReturnValueOnce(child);
+    const { warm } = warmQuery(async function* () {
+      yield { type: "result" };
+    });
+    mocks.startup.mockImplementation(startupThatSpawns(warm));
+    const { claudeAdapter } = await import("../src/server/adapters/claude.js");
+
+    await claudeAdapter.run(runInput());
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    expect(child.kill.mock.calls).toEqual([["SIGTERM"]]);
   });
 
   it("does not declare ready when the CLI fails to start", async () => {
