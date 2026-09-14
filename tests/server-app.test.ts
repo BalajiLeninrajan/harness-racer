@@ -12,13 +12,14 @@ const mocks = vi.hoisted(() => {
     models: [],
   };
   return {
+    provider,
     probe: vi.fn(async () => provider),
     runBenchmark: vi.fn(async () => undefined),
   };
 });
 
 vi.mock("../src/server/adapters/index.js", () => ({
-  adapters: [{ id: "codex", probe: mocks.probe }],
+  adapters: [{ id: "codex", name: "Codex", command: "codex", probe: mocks.probe }],
 }));
 
 vi.mock("../src/server/benchmark.js", () => ({
@@ -114,7 +115,7 @@ describe("server app", () => {
     ).toBe(false);
   });
 
-  it("returns a JSON error when provider discovery fails", async () => {
+  it("lists a harness whose probe rejects as uninstalled instead of failing the payload", async () => {
     mocks.probe.mockRejectedValueOnce(new Error("probe failed"));
     const response = fakeResponse();
 
@@ -124,8 +125,10 @@ describe("server app", () => {
         response as unknown as ServerResponse,
       ),
     ).toBe(true);
-    expect(response.status).toBe(500);
-    expect(JSON.parse(response.body)).toEqual({ error: "probe failed" });
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.body)).toEqual({
+      providers: [{ id: "codex", name: "Codex", command: "codex", installed: false, authenticated: null, models: [], message: "probe failed" }],
+    });
   });
 
   it("destroys upgrades from a mismatched or unparsable origin", () => {

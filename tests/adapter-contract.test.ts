@@ -29,4 +29,28 @@ describe("adapter contract", () => {
       models: [],
     });
   });
+
+  it("reports a probe that throws as an uninstalled harness instead of rejecting", async () => {
+    const adapter = defineAdapter(
+      { id: "grok", name: "Grok", command: "grok" },
+      {
+        async probe() {
+          throw new Error("agent exploded");
+        },
+        async run() {
+          return {};
+        },
+      },
+    );
+
+    await expect(adapter.probe()).resolves.toEqual({
+      id: "grok",
+      name: "Grok",
+      command: "grok",
+      installed: false,
+      authenticated: null,
+      models: [],
+      message: "agent exploded",
+    });
+  });
 });

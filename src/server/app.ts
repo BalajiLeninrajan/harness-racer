@@ -1,16 +1,24 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Server as HttpServer } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
-import { isHarnessId, type BenchmarkRequest, type ClientMessage, type ServerEvent } from "../shared/types.js";
+import { isHarnessId, type BenchmarkRequest, type ClientMessage, type ProviderInfo, type ServerEvent } from "../shared/types.js";
 import { adapters } from "./adapters/index.js";
+import { errorMessage } from "./adapters/lib/json.js";
 import { runBenchmark } from "./benchmark.js";
 
 function send(socket: WebSocket, event: ServerEvent): void {
   if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(event));
 }
 
-export async function getProviders() {
-  return Promise.all(adapters.map((adapter) => adapter.probe()));
+export async function getProviders(): Promise<ProviderInfo[]> {
+  // Adapters built with defineAdapter never reject, but the sweep is the
+  // browser's whole picture and one rejection must not blank it.
+  const outcomes = await Promise.allSettled(adapters.map((adapter) => adapter.probe()));
+  return outcomes.map((outcome, index) => {
+    if (outcome.status === "fulfilled") return outcome.value;
+    const { id, name, command } = adapters[index]!;
+    return { id, name, command, installed: false, authenticated: null, models: [], message: errorMessage(outcome.reason) };
+  });
 }
 
 export async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
