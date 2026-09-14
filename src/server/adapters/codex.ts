@@ -2,7 +2,7 @@ import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child
 import { createInterface, type Interface as ReadlineInterface } from "node:readline";
 
 import type { ModelOption } from "../../shared/types.js";
-import { runSession, type SessionPlan } from "./lib/run.js";
+import { abortError, runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 const COMMAND = "codex";
@@ -62,25 +62,19 @@ function errorMessage(value: unknown): string {
   return String(value);
 }
 
-function makeAbortError(): Error {
-  const error = new Error("Codex benchmark cancelled");
-  error.name = "AbortError";
-  return error;
-}
-
 function raceWithSignalAndTimeout<T>(
   promise: Promise<T>,
   signal: AbortSignal,
   timeoutMs: number,
   timeoutMessage: string,
 ): Promise<T> {
-  if (signal.aborted) return Promise.reject(makeAbortError());
+  if (signal.aborted) return Promise.reject(abortError());
 
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => finish(() => reject(new Error(timeoutMessage))), timeoutMs);
     timer.unref();
 
-    const onAbort = () => finish(() => reject(makeAbortError()));
+    const onAbort = () => finish(() => reject(abortError()));
     const finish = (settle: () => void) => {
       clearTimeout(timer);
       signal.removeEventListener("abort", onAbort);
@@ -186,7 +180,7 @@ class CodexRpcClient {
   ): Promise<T> {
     if (this.terminationError) return Promise.reject(this.terminationError);
     if (this.closed) return Promise.reject(new Error("Codex app-server is closed"));
-    if (options.signal?.aborted) return Promise.reject(makeAbortError());
+    if (options.signal?.aborted) return Promise.reject(abortError());
 
     const id = this.nextId++;
     return new Promise<T>((resolve, reject) => {
@@ -201,7 +195,7 @@ class CodexRpcClient {
       const onAbort = () => {
         this.pending.delete(id);
         cleanup();
-        reject(makeAbortError());
+        reject(abortError());
       };
       const cleanup = () => {
         clearTimeout(timer);
