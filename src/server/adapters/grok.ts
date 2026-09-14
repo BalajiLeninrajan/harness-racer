@@ -23,6 +23,14 @@ function outputTokensFrom(value: unknown): number | undefined {
   return undefined;
 }
 
+/** An error reply from the agent to one request, as opposed to the process failing. */
+class GrokRpcError extends Error {
+  constructor(readonly method: string, detail: unknown) {
+    super(`Grok ACP ${method} failed${typeof detail === "string" ? `: ${detail}` : ""}`);
+    this.name = "GrokRpcError";
+  }
+}
+
 class GrokAcpConnection {
   private readonly child: ChildProcessWithoutNullStreams;
   private nextId = 1;
@@ -109,10 +117,8 @@ class GrokAcpConnection {
       const pending = this.pending.get(message.id);
       if (!pending) return;
       this.pending.delete(message.id);
-      if (message.error !== undefined) {
-        const detail = recordFrom(message.error)?.message;
-        pending.reject(new Error(`Grok ACP ${pending.method} failed${typeof detail === "string" ? `: ${detail}` : ""}`));
-      } else pending.resolve(message.result);
+      if (message.error !== undefined) pending.reject(new GrokRpcError(pending.method, recordFrom(message.error)?.message));
+      else pending.resolve(message.result);
       return;
     }
     if (typeof message.method !== "string") return;
@@ -247,13 +253,21 @@ export const grokAdapter = defineAdapter({
         defaultModel: discovery.defaultModel,
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Only the agent's own error reply to authenticate says it is signed
+      // out. A crash, a stall, or a refused initialize says nothing certain
+      // about sign-in, and false would hide Grok from both UIs on a
+      // transient failure.
+      if (error instanceof GrokRpcError && error.method === "authenticate") {
+        return { installed: true, authenticated: false, version, models: [], message };
+      }
       return {
         installed: true,
-        authenticated: false,
+        authenticated: null,
         version,
         models: [{ id: "grok-build", label: "Grok Build", isDefault: true }],
         defaultModel: "grok-build",
-        message: error instanceof Error ? error.message : String(error),
+        message,
       };
     }
   },
