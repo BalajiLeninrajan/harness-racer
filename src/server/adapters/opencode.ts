@@ -254,7 +254,10 @@ export const openCodeAdapter = defineAdapter({
         ...listed,
       };
     } catch (error) {
-      return { ...probeFailure(error, version), authenticated: false };
+      // A server that did not start, a listing that stalled or a transport
+      // error says nothing about sign-in; only a listing with no connected
+      // provider does, and that is the length check above.
+      return probeFailure(error, version);
     }
   },
 
