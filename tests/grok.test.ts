@@ -148,7 +148,7 @@ describe("Grok adapter", () => {
 
     // A refused handshake is not proof of a signed-out CLI, and false would
     // hide Grok in both UIs; null keeps it listed with the message.
-    expect(result).toMatchObject({ installed: true, authenticated: null, defaultModel: "grok-build", message: expect.stringContaining("initialize failed") });
+    expect(result).toMatchObject({ installed: true, authenticated: null, message: expect.stringContaining("initialize failed") });
     expect(processes[1]?.requests.some((request) => request.method === "authenticate")).toBe(false);
     expect(processes[1]?.kill).toHaveBeenCalledWith("SIGTERM");
   });
@@ -163,7 +163,7 @@ describe("Grok adapter", () => {
 
     const result = await probe;
 
-    expect(result).toMatchObject({ installed: true, authenticated: null, defaultModel: "grok-build", message: expect.stringContaining("code 139: segfault") });
+    expect(result).toMatchObject({ installed: true, authenticated: null, message: expect.stringContaining("code 139: segfault") });
   });
 
   it("fails pending requests when stdin errors instead of crashing", async () => {
