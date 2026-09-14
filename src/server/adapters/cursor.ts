@@ -12,10 +12,14 @@ const CURSOR_COMMANDS = ["agent", "cursor-agent"] as const;
 // this long before the probe gives up on them.
 const PROBE_TIMEOUT_MS = 20_000;
 
-// The binary the last probe found. The run path reads it so a lane does not
-// spend its prep on a --version round trip; every probe resolves it afresh,
-// so a binary that vanishes is noticed the next time the list is read.
+// The binary the last successful probe found, and why the last probe could
+// not find one. Only probes resolve the binary: a lane that spawned
+// --version in open() would pay that round trip in its own harness prep and
+// no other lane would, so the run path reads the cache and refuses without
+// it. A --version that fails or stalls while the binary is still there
+// leaves the cache alone; only a binary gone from PATH clears it.
 let resolvedCommand: string | undefined;
+let lastProbeFailure: Error | undefined;
 
 /**
  * Finds the installed Cursor binary by name, trying `agent` first. A binary
@@ -30,6 +34,7 @@ async function resolveCursorCommand(): Promise<{ command: string; version: strin
       const result = await runCommand(candidate, ["--version"], { timeoutMs: PROBE_TIMEOUT_MS });
       if (result.code === 0) {
         resolvedCommand = candidate;
+        lastProbeFailure = undefined;
         return { command: candidate, version: result.firstLine };
       }
       lastError = new Error(`${candidate} --version exited with code ${result.code}${result.output ? `: ${result.output}` : ""}`);
@@ -37,15 +42,18 @@ async function resolveCursorCommand(): Promise<{ command: string; version: strin
       if (!notInstalled(error) || lastError === undefined) lastError = error;
     }
   }
-  resolvedCommand = undefined;
-  if (lastError === undefined || notInstalled(lastError)) {
-    throw new Error("Cursor Agent is not installed or is not available on PATH", { cause: lastError });
-  }
-  throw lastError;
+  const failure = lastError === undefined || notInstalled(lastError)
+    ? new Error("Cursor Agent is not installed or is not available on PATH", { cause: lastError })
+    : lastError instanceof Error ? lastError : new Error(errorMessage(lastError));
+  lastProbeFailure = failure;
+  if (notInstalled(failure)) resolvedCommand = undefined;
+  throw failure;
 }
 
-async function cursorCommand(): Promise<string> {
-  return resolvedCommand ?? (await resolveCursorCommand()).command;
+/** The binary a lane spawns, as the last probe found it; never a --version of the lane's own. */
+function cursorCommand(): string {
+  if (resolvedCommand) return resolvedCommand;
+  throw lastProbeFailure ?? new Error("Cursor Agent has not been found by a probe yet; refresh the harness list");
 }
 
 function modelFromRecord(value: unknown): ModelOption | undefined {
@@ -301,7 +309,7 @@ interface CursorSession {
 
 const cursorPlan: SessionPlan<CursorSession> = {
   async open(ctx) {
-    const command = await cursorCommand();
+    const command = cursorCommand();
     let sessionId: string | undefined;
     const connection = new CursorAcpConnection(command, ctx.cwd, (method, params) => {
       if (method !== "session/update") return;

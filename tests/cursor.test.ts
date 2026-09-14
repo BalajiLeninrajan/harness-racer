@@ -1,6 +1,8 @@
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { AdapterRunInput } from "../src/server/adapters/types.js";
+
 const mocks = vi.hoisted(() => ({ spawn: vi.fn() }));
 vi.mock("node:child_process", () => ({ spawn: mocks.spawn }));
 
@@ -58,6 +60,25 @@ function acpProcess(responses: Record<string, unknown>, hang: string[] = []) {
     return true;
   }) });
   return child;
+}
+
+// The adapter after a probe that found `agent` and a signed-out status, so
+// the run path has a binary and the probe spawned no ACP process.
+async function probedAdapter() {
+  mocks.spawn
+    .mockImplementationOnce(() => commandProcess("1.2\n"))
+    .mockImplementationOnce(() => commandProcess('{"loggedIn":false}\n'));
+  const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+  await cursorAdapter.probe();
+  mocks.spawn.mockClear();
+  return cursorAdapter;
+}
+
+function runInput(model: string, overrides: Partial<AdapterRunInput> = {}): AdapterRunInput {
+  return {
+    model, prompt: "test", cwd: "/tmp/project", signal: new AbortController().signal,
+    onReady: vi.fn(), waitForStart: vi.fn(), onDelta: vi.fn(), ...overrides,
+  };
 }
 
 describe("Cursor adapter", () => {
@@ -178,6 +199,39 @@ describe("Cursor adapter", () => {
     expect(result.message).toBe("Cursor ACP model discovery did not finish within 20s: Open https://cursor.com/login to sign in");
   });
 
+  it("refuses to run before a probe has found the binary rather than resolving it in the lane", async () => {
+    const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+
+    await expect(cursorAdapter.run(runInput("gpt-5"))).rejects.toThrow("Cursor Agent has not been found by a probe yet");
+    expect(mocks.spawn).not.toHaveBeenCalled();
+
+    // After a probe that found nothing on PATH, the run fails with that probe's reason.
+    mocks.spawn.mockImplementation((command: string) => missingProcess(command));
+    await cursorAdapter.probe();
+    await expect(cursorAdapter.run(runInput("gpt-5"))).rejects.toThrow("Cursor Agent is not installed or is not available on PATH");
+    expect(mocks.spawn.mock.calls.map((call) => call.slice(0, 2))).toEqual([["agent", ["--version"]], ["cursor-agent", ["--version"]]]);
+  });
+
+  it("keeps the binary from the last good probe when a later --version stalls", async () => {
+    const cursorAdapter = await probedAdapter();
+    vi.useFakeTimers();
+    const stuck = acpProcess({});
+    mocks.spawn
+      .mockImplementationOnce(() => stuck)
+      .mockImplementationOnce(() => missingProcess("cursor-agent"));
+    const probe = cursorAdapter.probe();
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(await probe).toMatchObject({ installed: true, models: [], message: "agent --version did not finish within 20s" });
+    vi.useRealTimers();
+
+    // The binary is still there, so the next lane spawns it straight away:
+    // no --version of its own between launch and ready.
+    mocks.spawn.mockClear();
+    mocks.spawn.mockImplementationOnce(() => acpProcess({ initialize: {}, authenticate: {}, "session/new": { sessionId: "session-1" } }));
+    await expect(cursorAdapter.run(runInput("default"))).rejects.toThrow("Cursor Auto is dynamic");
+    expect(mocks.spawn.mock.calls.map((call) => call.slice(0, 2))).toEqual([["agent", ["acp"]]]);
+  });
+
   it("reports a status command that never exits instead of hanging the probe", async () => {
     vi.useFakeTimers();
     const stuck = acpProcess({});
@@ -206,10 +260,8 @@ describe("Cursor adapter", () => {
       "session/prompt": { usage: { outputTokens: 11 } },
     };
     let acp!: FakeChild;
-    mocks.spawn
-      .mockImplementationOnce(() => commandProcess("1.2\n"))
-      .mockImplementationOnce(() => (acp = acpProcess(responses)));
-    const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+    const cursorAdapter = await probedAdapter();
+    mocks.spawn.mockImplementationOnce(() => (acp = acpProcess(responses)));
     const input = {
       model: "gpt-5",
       prompt: "Say hello",
@@ -226,6 +278,8 @@ describe("Cursor adapter", () => {
     };
 
     await expect(cursorAdapter.run(input)).resolves.toEqual({ nativeOutputTokens: 11 });
+    // The lane spawned the agent the probe found and nothing else.
+    expect(mocks.spawn.mock.calls.map((call) => call.slice(0, 2))).toEqual([["agent", ["acp"]]]);
     expect(input.onReady).toHaveBeenCalledOnce();
     expect(input.onDelta).toHaveBeenCalledWith("hello");
     const requests = acp.stdin.write.mock.calls.map(([line]) => JSON.parse(line as string));
@@ -239,15 +293,10 @@ describe("Cursor adapter", () => {
 
   it("fails pending requests when stdin errors instead of crashing", async () => {
     let acp!: FakeChild;
-    mocks.spawn
-      .mockImplementationOnce(() => commandProcess("1.2\n"))
-      .mockImplementationOnce(() => (acp = acpProcess({ initialize: {} }, ["authenticate"])));
-    const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+    const cursorAdapter = await probedAdapter();
+    mocks.spawn.mockImplementationOnce(() => (acp = acpProcess({ initialize: {} }, ["authenticate"])));
 
-    const run = cursorAdapter.run({
-      model: "gpt-5", prompt: "test", cwd: "/tmp/project", signal: new AbortController().signal,
-      onReady: vi.fn(), waitForStart: vi.fn(), onDelta: vi.fn(),
-    });
+    const run = cursorAdapter.run(runInput("gpt-5"));
     await vi.waitFor(() => expect(acp.stdin.write).toHaveBeenCalledTimes(2));
     acp.stdin.emit("error", new Error("write EPIPE"));
 
@@ -256,18 +305,13 @@ describe("Cursor adapter", () => {
   });
 
   it("rejects Cursor Auto before sending a benchmark prompt", async () => {
-    mocks.spawn
-      .mockImplementationOnce(() => commandProcess("1.2\n"))
-      .mockImplementationOnce(() => acpProcess({
-        initialize: {}, authenticate: {}, "session/new": { sessionId: "session-1" },
-      }));
-    const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+    const cursorAdapter = await probedAdapter();
+    mocks.spawn.mockImplementationOnce(() => acpProcess({
+      initialize: {}, authenticate: {}, "session/new": { sessionId: "session-1" },
+    }));
     const onReady = vi.fn();
 
-    await expect(cursorAdapter.run({
-      model: "default", prompt: "test", cwd: "/tmp/project", signal: new AbortController().signal,
-      onReady, waitForStart: vi.fn(), onDelta: vi.fn(),
-    })).rejects.toThrow("Cursor Auto is dynamic");
+    await expect(cursorAdapter.run(runInput("default", { onReady }))).rejects.toThrow("Cursor Auto is dynamic");
     // A lane that fails in setup was never ready; the engine releases the
     // start barrier on the rejection itself.
     expect(onReady).not.toHaveBeenCalled();
