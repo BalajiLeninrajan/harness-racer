@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 import type { ModelOption } from "../../shared/types.js";
+import { runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 // Drives the Antigravity CLI (`agy`) in headless print mode with NDJSON on both ends:
@@ -21,12 +22,6 @@ type JsonRecord = Record<string, unknown>;
 
 function recordFrom(value: unknown): JsonRecord | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : undefined;
-}
-
-function abortError(): Error {
-  const error = new Error("Benchmark cancelled");
-  error.name = "AbortError";
-  return error;
 }
 
 function stripAnsi(value: string): string {
@@ -97,9 +92,9 @@ class AntigravityCliSession {
   private stderr = "";
   private closed = false;
   private readonly ready: Promise<void>;
-  private readonly finished: Promise<AdapterRunOutput>;
+  private readonly finished: Promise<unknown>;
   private resolveReady!: () => void;
-  private resolveFinished!: (output: AdapterRunOutput) => void;
+  private resolveFinished!: (result: unknown) => void;
   private rejectAll!: (error: Error) => void;
 
   constructor(model: string, cwd: string, private readonly onDelta: (text: string) => void) {
@@ -141,7 +136,8 @@ class AntigravityCliSession {
     return this.ready;
   }
 
-  prompt(text: string): Promise<AdapterRunOutput> {
+  /** Resolves with the turn's `result` payload once the CLI reports it. */
+  prompt(text: string): Promise<unknown> {
     this.write({ event: "user", message: { role: "user", content: text } });
     return this.finished;
   }
@@ -191,8 +187,7 @@ class AntigravityCliSession {
           this.rejectAll(new Error(`Antigravity CLI turn failed: ${detail}`));
           return;
         }
-        const nativeOutputTokens = outputTokensFrom(result);
-        this.resolveFinished(nativeOutputTokens === undefined ? {} : { nativeOutputTokens });
+        this.resolveFinished(result);
         return;
       }
       default:
@@ -201,32 +196,19 @@ class AntigravityCliSession {
   }
 }
 
-async function runAntigravity(input: AdapterRunInput): Promise<AdapterRunOutput> {
-  if (input.signal.aborted) throw abortError();
-  let ready = false;
-  const signalReady = () => {
-    if (!ready) {
-      ready = true;
-      input.onReady();
-    }
-  };
-  const session = new AntigravityCliSession(input.model, input.cwd, input.onDelta);
-  const onAbort = () => session.terminate();
-  input.signal.addEventListener("abort", onAbort, { once: true });
-  try {
+const antigravityPlan: SessionPlan<AntigravityCliSession> = {
+  async open(ctx) {
+    const session = new AntigravityCliSession(ctx.model, ctx.cwd, ctx.onDelta);
+    ctx.onCleanup(() => session.terminate());
     await session.waitUntilReady();
-    signalReady();
-    await input.waitForStart();
-    if (input.signal.aborted) throw abortError();
-    return await session.prompt(input.prompt);
-  } catch (error) {
-    signalReady();
-    if (input.signal.aborted) throw abortError();
-    throw error;
-  } finally {
-    input.signal.removeEventListener("abort", onAbort);
-    session.terminate();
-  }
+    return session;
+  },
+  prompt: (session, text) => session.prompt(text),
+  tokens: outputTokensFrom,
+};
+
+function runAntigravity(input: AdapterRunInput): Promise<AdapterRunOutput> {
+  return runSession(input, antigravityPlan);
 }
 
 export const antigravityAdapter = defineAdapter({

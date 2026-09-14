@@ -222,6 +222,11 @@ describe("benchmark engine", () => {
     // The failure is reported when it happens, not after the slowest lane finishes.
     expect(events.findIndex((event) => event.type === "run.error"))
       .toBeLessThan(events.findIndex((event) => event.type === "run.complete"));
+    // A lane that failed before it was ready is never reported as ready: the
+    // adapter does not have to call onReady for the barrier to be released,
+    // and a ready status here would be measured as harness prep.
+    expect(statusesOf(events, "broken")).toEqual(["starting", "starting"]);
+    expect(statusesOf(events, "healthy")).toEqual(["starting", "ready", "running", "complete", "starting", "ready", "running", "complete"]);
 
     const completed = events.find((event) => event.type === "benchmark.complete");
     expect(completed?.type).toBe("benchmark.complete");
@@ -229,6 +234,27 @@ describe("benchmark engine", () => {
     expect(completed.results).toHaveLength(2);
     expect(completed.results.every((result) => result.competitorId === "healthy" && result.valid)).toBe(true);
     expect(completed.summary.map((row) => row.competitor.id)).toEqual(["healthy"]);
+  });
+
+  it("releases the parallel start barrier when a lane finishes without ever saying it was ready", async () => {
+    // Off-contract, but the engine must not hang on it: a lane that streams
+    // and fulfils without onReady or waitForStart leaves the ready count
+    // short, and the other lane has no timer while it waits at the barrier.
+    const mute: HarnessAdapter = {
+      ...instantAdapter("codex"),
+      async run(input) {
+        input.onDelta(corpusFrom(input.prompt));
+        return {};
+      },
+    };
+    const events: ServerEvent[] = [];
+
+    await runBenchmark(parallelRequest(), [mute, instantAdapter("cursor")], new AbortController().signal, (event) => events.push(event));
+
+    expect(statusesOf(events, "a")).toEqual(["starting", "complete", "starting", "complete"]);
+    expect(statusesOf(events, "b")).toEqual(["starting", "ready", "running", "complete", "starting", "ready", "running", "complete"]);
+    expect(events.filter((event) => event.type === "run.error")).toEqual([]);
+    expect(events.at(-1)?.type).toBe("benchmark.complete");
   });
 
   it("rejects with the cancel reason when a parallel heat is cancelled", async () => {
@@ -281,8 +307,8 @@ describe("benchmark engine", () => {
   it("drops what an adapter reports after its lane was cancelled", async () => {
     const controller = new AbortController();
     const events: ServerEvent[] = [];
-    // After the cancel the adapter behaves like a real one winding down: it
-    // signals ready from its catch block and flushes output it still had.
+    // After the cancel the adapter misbehaves the way a winding-down process
+    // can: it flushes output it still had and repeats its ready signal.
     const adapter: HarnessAdapter = {
       ...stallingAdapter("codex"),
       async run(input) {

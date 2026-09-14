@@ -1,9 +1,9 @@
 import { EventEmitter } from "node:events";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn(),
-  query: vi.fn(),
+  startup: vi.fn(),
   // A stand-in for the installed executable's recognized-model table, including the dated,
   // provider-suffixed, and explicit-zero-minor forms that alias a canonical id and must not
   // become separate entries.
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("node:child_process", () => ({ spawn: mocks.spawn }));
-vi.mock("@anthropic-ai/claude-agent-sdk", () => ({ query: mocks.query }));
+vi.mock("@anthropic-ai/claude-agent-sdk", () => ({ startup: mocks.startup }));
 vi.mock("node:fs", () => ({
   constants: { X_OK: 1 },
   accessSync: (file: string) => {
@@ -55,8 +55,30 @@ function runInput(signal = new AbortController().signal) {
   };
 }
 
+// The CLI process the adapter spawns for the SDK: alive until a test says
+// otherwise, and recording the signals it is sent.
+function cliProcess() {
+  return Object.assign(new EventEmitter(), {
+    stdin: new EventEmitter(),
+    stdout: new EventEmitter(),
+    kill: vi.fn(),
+    exitCode: null as number | null,
+    signalCode: null as string | null,
+  });
+}
+
+// Like the SDK: spawns the CLI through the adapter's hook, then hands back
+// the warm query once the handshake would have completed.
+function startupThatSpawns(warm: unknown) {
+  return async ({ options }: { options: { cwd: string; spawnClaudeCodeProcess: (spawn: object) => unknown } }) => {
+    options.spawnClaudeCodeProcess({ command: "/opt/claude", args: ["--output-format", "stream-json"], cwd: options.cwd, env: {} });
+    return warm;
+  };
+}
+
 describe("Claude adapter", () => {
   beforeEach(() => vi.clearAllMocks());
+  afterEach(() => vi.useRealTimers());
 
   it("probes version, authentication, and the models the installed executable recognizes", async () => {
     vi.stubEnv("PATH", "/fake/bin");
@@ -95,26 +117,146 @@ describe("Claude adapter", () => {
     expect(result.message).toMatch(/could not resolve the claude executable/i);
   });
 
-  it("streams SDK deltas and returns native output-token usage", async () => {
+  // A stand-in for the SDK's WarmQuery: the CLI is "up" once startup resolves,
+  // and query() hands back the message iterator for the one prompt.
+  function warmQuery(messages: () => AsyncGenerator<unknown>, order: string[] = []) {
     const close = vi.fn();
-    mocks.query.mockReturnValue(Object.assign((async function* () {
+    const warm = {
+      query: vi.fn((prompt: string) => {
+        order.push(`query:${prompt}`);
+        return Object.assign(messages(), { close });
+      }),
+      close: vi.fn(),
+    };
+    return { warm, close };
+  }
+
+  it("is ready once the CLI has started, prompts at the start signal, and streams SDK deltas", async () => {
+    const order: string[] = [];
+    const { warm, close } = warmQuery(async function* () {
       yield { type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "hel" } } };
       yield { type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "lo" } } };
       yield { type: "result", usage: { output_tokens: 7 } };
-    })(), { close }));
+    }, order);
+    mocks.startup.mockImplementation(async () => {
+      order.push("startup");
+      return warm;
+    });
     const { claudeAdapter } = await import("../src/server/adapters/claude.js");
-    const input = runInput();
+    const input = {
+      ...runInput(),
+      onReady: vi.fn(() => { order.push("ready"); }),
+      waitForStart: vi.fn(async () => { order.push("start"); }),
+    };
 
     await expect(claudeAdapter.run(input)).resolves.toEqual({ nativeOutputTokens: 7 });
 
+    // The CLI's boot is harness prep, not part of the prompt's time to first output.
+    expect(order).toEqual(["startup", "ready", "start", "query:Say hello"]);
     expect(input.onReady).toHaveBeenCalledOnce();
-    expect(input.waitForStart).toHaveBeenCalledOnce();
     expect(input.onDelta.mock.calls.flat()).toEqual(["hel", "lo"]);
-    expect(mocks.query).toHaveBeenCalledWith(expect.objectContaining({
-      prompt: "Say hello",
-      options: expect.objectContaining({ model: "claude-sonnet-5", permissionMode: "plan", allowedTools: [] }),
-    }));
+    expect(mocks.startup).toHaveBeenCalledWith({
+      options: expect.objectContaining({
+        cwd: "/tmp/project",
+        model: "claude-sonnet-5",
+        permissionMode: "plan",
+        allowedTools: [],
+        abortController: expect.any(AbortController),
+      }),
+    });
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("spawns the CLI itself and kills it at teardown instead of waiting on the SDK's close", async () => {
+    vi.useFakeTimers();
+    const child = cliProcess();
+    mocks.spawn.mockReturnValueOnce(child);
+    const { warm, close } = warmQuery(async function* () {
+      yield { type: "result", usage: { output_tokens: 1 } };
+    });
+    mocks.startup.mockImplementation(startupThatSpawns(warm));
+    const { claudeAdapter } = await import("../src/server/adapters/claude.js");
+
+    await claudeAdapter.run(runInput());
+
+    expect(mocks.spawn).toHaveBeenCalledWith(
+      "/opt/claude",
+      ["--output-format", "stream-json"],
+      expect.objectContaining({ cwd: "/tmp/project", stdio: ["pipe", "pipe", "ignore"] }),
+    );
+    // The SDK is closed first, then the process is signalled at once: the
+    // SDK's own close would not send SIGTERM for 2 s.
+    expect(close).toHaveBeenCalledOnce();
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(child.kill).not.toHaveBeenCalledWith("SIGKILL");
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+  });
+
+  it("does not follow SIGTERM with SIGKILL once the CLI has exited", async () => {
+    vi.useFakeTimers();
+    const child = cliProcess();
+    child.kill.mockImplementation(() => { child.signalCode = "SIGTERM"; return true; });
+    mocks.spawn.mockReturnValueOnce(child);
+    const { warm } = warmQuery(async function* () {
+      yield { type: "result" };
+    });
+    mocks.startup.mockImplementation(startupThatSpawns(warm));
+    const { claudeAdapter } = await import("../src/server/adapters/claude.js");
+
+    await claudeAdapter.run(runInput());
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    expect(child.kill.mock.calls).toEqual([["SIGTERM"]]);
+  });
+
+  it("does not declare ready when the CLI fails to start", async () => {
+    mocks.startup.mockRejectedValue(new Error("Subprocess initialization did not complete within 60000ms"));
+    const { claudeAdapter } = await import("../src/server/adapters/claude.js");
+    const input = runInput();
+
+    await expect(claudeAdapter.run(input)).rejects.toThrow("Subprocess initialization did not complete");
+    expect(input.onReady).not.toHaveBeenCalled();
+    expect(input.waitForStart).not.toHaveBeenCalled();
+  });
+
+  it("rejects a run cancelled mid-stream even though the SDK ends the iterator cleanly", async () => {
+    const controller = new AbortController();
+    const { warm, close } = warmQuery(async function* () {
+      yield { type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "hel" } } };
+      controller.abort(new Error("Benchmark cancelled."));
+      // close() makes the CLI exit 0, and the SDK ends the iterator as if the turn had finished.
+      yield { type: "assistant", message: { content: [{ type: "text", text: "hello" }] } };
+    });
+    mocks.startup.mockResolvedValue(warm);
+    const { claudeAdapter } = await import("../src/server/adapters/claude.js");
+    const input = runInput(controller.signal);
+
+    await expect(claudeAdapter.run(input)).rejects.toMatchObject({ name: "AbortError" });
+    expect(input.onDelta.mock.calls.flat()).toEqual(["hel"]);
+    expect(close).toHaveBeenCalled();
+  });
+
+  it("aborts the CLI when cancelled while it is still starting", async () => {
+    const controller = new AbortController();
+    let sdkAbort: AbortController | undefined;
+    // Like the SDK: the handshake fails once the controller it was given aborts.
+    mocks.startup.mockImplementation(({ options }: { options: { abortController: AbortController } }) => {
+      sdkAbort = options.abortController;
+      return new Promise((_resolve, reject) => {
+        options.abortController.signal.addEventListener("abort", () => reject(new Error("Claude Code process aborted by user")), { once: true });
+      });
+    });
+    const { claudeAdapter } = await import("../src/server/adapters/claude.js");
+    const input = runInput(controller.signal);
+
+    const run = claudeAdapter.run(input);
+    await vi.waitFor(() => expect(sdkAbort).toBeDefined());
+    controller.abort(new Error("Benchmark cancelled."));
+
+    await expect(run).rejects.toMatchObject({ name: "AbortError" });
+    expect(sdkAbort?.signal.aborted).toBe(true);
+    expect(input.onReady).not.toHaveBeenCalled();
   });
 
   it("rejects an already-cancelled run without invoking the SDK", async () => {
@@ -123,6 +265,6 @@ describe("Claude adapter", () => {
     const { claudeAdapter } = await import("../src/server/adapters/claude.js");
 
     await expect(claudeAdapter.run(runInput(controller.signal))).rejects.toMatchObject({ name: "AbortError" });
-    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.startup).not.toHaveBeenCalled();
   });
 });

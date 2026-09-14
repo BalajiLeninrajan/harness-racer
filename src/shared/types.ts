@@ -21,6 +21,8 @@ export interface ProviderInfo {
   name: string;
   command: string;
   installed: boolean;
+  // true: signed in. false: the CLI itself reported signed out, which hides the
+  // harness. null: unknown (a probe step failed or the CLI does not say); still runnable.
   authenticated: boolean | null;
   version?: string;
   message?: string;
