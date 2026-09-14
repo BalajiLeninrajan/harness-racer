@@ -86,7 +86,7 @@ export function About({ onBack }: AboutProps) {
         </div>
         <p className="boundary-note">
           <Clock3 size={15} /> Results are medians of valid measured runs across both texts. Warmups and invalid outputs are excluded.
-          Harnesses expose different readiness boundaries, so harness prep is based on when each adapter declares itself ready.
+          Harness prep ends at the same point in every lane: the harness process is up, signed in, and holds a session on the chosen model. The prompt is sent only after that.
         </p>
       </section>
 
