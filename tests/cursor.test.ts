@@ -29,6 +29,19 @@ function commandProcess(stdout: string, stderr = "", code = 0) {
   return child;
 }
 
+// A spawn for a binary that is not on PATH.
+function missingProcess(command: string) {
+  const child = new EventEmitter() as FakeChild;
+  child.stdin = Object.assign(new EventEmitter(), { write: vi.fn() });
+  child.stdout = Object.assign(new EventEmitter(), { setEncoding: vi.fn() });
+  child.stderr = Object.assign(new EventEmitter(), { setEncoding: vi.fn() });
+  child.exitCode = null;
+  child.signalCode = null;
+  child.kill = vi.fn();
+  queueMicrotask(() => child.emit("error", Object.assign(new Error(`spawn ${command} ENOENT`), { code: "ENOENT" })));
+  return child;
+}
+
 // Requests named in `hang` are left unanswered.
 function acpProcess(responses: Record<string, unknown>, hang: string[] = []) {
   const child = new EventEmitter() as FakeChild;
@@ -71,6 +84,29 @@ describe("Cursor adapter", () => {
     // Signed out, so no model list: nothing is invented to stand in for one.
     expect(result).toMatchObject({ installed: true, authenticated: false, version: "cursor-agent 1.2", models: [] });
     expect(result.defaultModel).toBeUndefined();
+  });
+
+  it("reports the --version failure itself when the binary is present but cursor-agent is not", async () => {
+    mocks.spawn
+      .mockImplementationOnce(() => commandProcess("", "agent: license check failed", 2))
+      .mockImplementationOnce(() => missingProcess("cursor-agent"));
+    const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+
+    const result = await cursorAdapter.probe();
+
+    // The binary is there, so "not installed" would contradict the flag; the
+    // message is the reason --version gave.
+    expect(result).toMatchObject({ installed: true, authenticated: null, models: [], message: "agent --version exited with code 2: agent: license check failed" });
+  });
+
+  it("reports not installed only when every candidate is missing from PATH", async () => {
+    mocks.spawn.mockImplementation((command: string) => missingProcess(command));
+    const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+
+    const result = await cursorAdapter.probe();
+
+    expect(result).toMatchObject({ installed: false, authenticated: null, models: [], message: "Cursor Agent is not installed or is not available on PATH" });
+    expect(mocks.spawn).toHaveBeenCalledTimes(2);
   });
 
   it("probes the model list over ACP and marks the session's current model as default", async () => {

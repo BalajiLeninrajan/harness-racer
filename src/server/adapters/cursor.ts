@@ -17,7 +17,12 @@ const PROBE_TIMEOUT_MS = 20_000;
 // so a binary that vanishes is noticed the next time the list is read.
 let resolvedCommand: string | undefined;
 
-/** Finds the installed Cursor binary by name, trying `agent` first. */
+/**
+ * Finds the installed Cursor binary by name, trying `agent` first. A binary
+ * that is present but fails or stalls on --version outranks one that is
+ * absent, and its own failure is what gets thrown: the fixed "not installed"
+ * message is only right when every candidate was missing from PATH.
+ */
 async function resolveCursorCommand(): Promise<{ command: string; version: string }> {
   let lastError: unknown;
   for (const candidate of CURSOR_COMMANDS) {
@@ -27,13 +32,16 @@ async function resolveCursorCommand(): Promise<{ command: string; version: strin
         resolvedCommand = candidate;
         return { command: candidate, version: result.firstLine };
       }
-      lastError = new Error(result.firstLine || `${candidate} --version exited with code ${result.code}`);
+      lastError = new Error(`${candidate} --version exited with code ${result.code}${result.firstLine ? `: ${result.firstLine}` : ""}`);
     } catch (error) {
       if (!notInstalled(error) || lastError === undefined) lastError = error;
     }
   }
   resolvedCommand = undefined;
-  throw new Error("Cursor Agent is not installed or is not available on PATH", { cause: lastError });
+  if (lastError === undefined || notInstalled(lastError)) {
+    throw new Error("Cursor Agent is not installed or is not available on PATH", { cause: lastError });
+  }
+  throw lastError;
 }
 
 async function cursorCommand(): Promise<string> {
