@@ -345,6 +345,70 @@ describe("benchmark engine", () => {
     expect(completed.results).toHaveLength(1);
   });
 
+  it("starts the next lane only after a timed-out adapter has wound down", async () => {
+    // Real time still passes for the workspace I/O the next lane does before
+    // it reports anything, so the check that it has not started waits it out.
+    const realSetTimeout = setTimeout;
+    const settleIo = () => new Promise((resolve) => realSetTimeout(resolve, 50));
+    vi.useFakeTimers();
+    const events: ServerEvent[] = [];
+    let stalled!: () => void;
+    const firstRunStalled = new Promise<void>((resolve) => { stalled = resolve; });
+    let woundDown = false;
+    let runs = 0;
+    // Stalls in the first heat only. After the timeout it behaves like a real
+    // adapter: it rejects once its child has been interrupted and killed.
+    const slow: HarnessAdapter = {
+      ...stallingAdapter("codex"),
+      async run(input) {
+        runs += 1;
+        if (runs > 1) return instantAdapter("codex").run(input);
+        input.onReady();
+        await input.waitForStart();
+        input.onDelta(corpusFrom(input.prompt).slice(0, 10));
+        stalled();
+        try {
+          return await rejectOnAbort(input.signal);
+        } catch (error) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          woundDown = true;
+          throw error;
+        }
+      },
+    };
+    let startedAfterWindDown: boolean | undefined;
+    const next: HarnessAdapter = {
+      ...instantAdapter("cursor"),
+      run(input) {
+        startedAfterWindDown ??= woundDown;
+        return instantAdapter("cursor").run(input);
+      },
+    };
+    const request: BenchmarkRequest = {
+      type: "start",
+      mode: "sequential",
+      samplePreset: "quick",
+      competitors: [
+        { id: "a", harness: "codex", model: "alpha", label: "Alpha", color: "#fff" },
+        { id: "b", harness: "cursor", model: "beta", label: "Beta", color: "#000" },
+      ],
+    };
+
+    const done = runBenchmark(request, [slow, next], new AbortController().signal, (event) => events.push(event));
+    await firstRunStalled;
+    await vi.advanceTimersByTimeAsync(120_000);
+    await settleIo();
+    expect(statusesOf(events, "b")).toEqual([]);
+    await vi.advanceTimersByTimeAsync(500);
+    await done;
+
+    expect(startedAfterWindDown).toBe(true);
+    expect(events.filter((event) => event.type === "run.error")).toEqual([
+      expect.objectContaining({ competitorId: "a", message: "Run timed out after 120 seconds." }),
+    ]);
+    expect(events.flatMap((event) => (event.type === "run.complete" ? [event.result.competitorId] : []))).toEqual(["b", "a", "b"]);
+  });
+
   it("does not report a run complete when it was cancelled as the adapter resolved", async () => {
     const controller = new AbortController();
     const events: ServerEvent[] = [];
@@ -372,6 +436,7 @@ describe("benchmark engine", () => {
   });
 
   it("frees a lane waiting at the start barrier when the benchmark is cancelled", async () => {
+    vi.useFakeTimers();
     const controller = new AbortController();
     const events: ServerEvent[] = [];
     const runs = { count: 0 };
@@ -384,11 +449,11 @@ describe("benchmark engine", () => {
     );
     await vi.waitFor(() => expect(statusesOf(events, "a")).toContain("ready"));
     controller.abort(new Error("Benchmark cancelled."));
-    const settled = new Promise<never>((_resolve, reject) => {
-      setTimeout(() => reject(new Error("The benchmark never settled.")), 1_000);
-    });
+    // The stuck lane ignores the cancel, so the benchmark settles once that
+    // lane's teardown grace runs out.
+    await vi.advanceTimersByTimeAsync(2_000);
 
-    await expect(Promise.race([done, settled])).rejects.toThrow("Benchmark cancelled.");
+    await expect(done).rejects.toThrow("Benchmark cancelled.");
     expect(statusesOf(events, "a")).not.toContain("running");
   });
 
@@ -405,6 +470,10 @@ describe("benchmark engine", () => {
     );
     await vi.waitFor(() => expect(statusesOf(events, "a")).toContain("ready"));
     await vi.advanceTimersByTimeAsync(120_000);
+    // The stuck adapter never settles, so its lane holds the heat for the
+    // teardown grace before the ready lane is let through.
+    expect(statusesOf(events, "a")).not.toContain("running");
+    await vi.advanceTimersByTimeAsync(2_000);
     await done;
 
     // Only the stuck lane is blamed; the lane that was ready and waiting at

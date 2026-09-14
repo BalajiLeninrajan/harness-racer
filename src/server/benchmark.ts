@@ -10,7 +10,7 @@ import type {
   ServerEvent,
   WorkloadId,
 } from "../shared/types.js";
-import type { HarnessAdapter } from "./adapters/types.js";
+import type { AdapterRunOutput, HarnessAdapter } from "./adapters/types.js";
 import { countNormalizedTokens, streamAnomalyMessage, summarizeResults } from "./metrics.js";
 import { validateOutput, workloads } from "./workloads.js";
 
@@ -23,6 +23,9 @@ const presetRuns: Record<SamplePreset, { warmups: number; measured: number }> = 
 type Emit = (event: ServerEvent) => void;
 
 const RUN_TIMEOUT_MS = 120_000;
+// Long enough for every adapter to have sent SIGKILL to a child that ignored
+// SIGTERM (Codex: up to 800 ms interrupt, then 1 s; the rest: 1.5 s).
+const TEARDOWN_GRACE_MS = 2_000;
 
 // Settles with the promise, or rejects with the signal's reason as soon as it
 // aborts, so nothing in runOne keeps waiting on an adapter that ignores it.
@@ -34,6 +37,17 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
     // The promise is observed even when the signal was already aborted: the
     // caller has started the work, and its rejection must not go unhandled.
     promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
+}
+
+// Resolves once the promise settles, or after the grace period if it does not.
+function settledWithin(promise: Promise<unknown>, graceMs: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, graceMs);
+    promise.catch(() => undefined).finally(() => {
+      clearTimeout(timer);
+      resolve();
+    });
   });
 }
 
@@ -77,11 +91,12 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
   // every adapter signals ready from its catch block), and nothing they
   // report then belongs to this lane, or to a benchmark started since.
   const closed = () => settled || controller.signal.aborted;
+  let adapterRun: Promise<AdapterRunOutput> | undefined;
 
   emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "starting" });
 
   try {
-    const adapterResult = await untilAborted(adapter.run({
+    adapterRun = adapter.run({
       model: competitor.model,
       prompt: workload.prompt,
       cwd: workspace,
@@ -129,7 +144,8 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
           ...(deltaCount > 1 ? { liveVisibleTokensPerSecond: tokens / (visibleStreamMs / 1000) } : {}),
         });
       },
-    }), controller.signal);
+    });
+    const adapterResult = await untilAborted(adapterRun, controller.signal);
 
     // An adapter can resolve after its process was cut short by the abort, so
     // a resolved run is only complete if nothing aborted it in the meantime.
@@ -183,6 +199,12 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
     settled = true;
     clearTimeout(timeout);
     parentSignal.removeEventListener("abort", abort);
+    // A lane given up on (timeout or cancel) rejected before its adapter did,
+    // and the adapter is still interrupting and killing its child. The next
+    // lane or heat would otherwise be measured while sharing the machine with
+    // that dying process, and the workspace it runs in would be deleted under
+    // it. Wait for the adapter to settle, but not on one that never does.
+    if (adapterRun) await settledWithin(adapterRun, TEARDOWN_GRACE_MS);
     await rm(workspace, { recursive: true, force: true }).catch(() => undefined);
   }
 }
