@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import type { IncomingMessage, Server as HttpServer, ServerResponse } from "node:http";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const provider = {
@@ -26,7 +26,7 @@ vi.mock("../src/server/benchmark.js", () => ({
   runBenchmark: mocks.runBenchmark,
 }));
 
-import { attachWebSockets, handleApi } from "../src/server/app.js";
+import { attachWebSockets, getProviders, handleApi } from "../src/server/app.js";
 
 class FakeWebSocket extends EventEmitter {
   readonly OPEN = 1;
@@ -78,11 +78,19 @@ async function flush(): Promise<void> {
 }
 
 describe("server app", () => {
+  let clockOffsetMs = 0;
   beforeEach(() => {
+    // The provider sweep is memoised for a few seconds; only the clock is
+    // faked (setImmediate still runs), and each test starts a minute after
+    // the last so no test sees the previous test's sweep.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    clockOffsetMs += 60_000;
+    vi.setSystemTime(Date.now() + clockOffsetMs);
     mocks.probe.mockClear();
     mocks.runBenchmark.mockReset();
     mocks.runBenchmark.mockResolvedValue(undefined);
   });
+  afterEach(() => vi.useRealTimers());
 
   it("serves provider metadata only from the providers endpoint", async () => {
     const response = fakeResponse();
@@ -129,6 +137,36 @@ describe("server app", () => {
     expect(JSON.parse(response.body)).toEqual({
       providers: [{ id: "codex", name: "Codex", command: "codex", installed: false, authenticated: null, models: [], message: "probe failed" }],
     });
+  });
+
+  it("shares one probe sweep between callers that arrive together or soon after", async () => {
+    let finish!: () => void;
+    mocks.probe.mockImplementationOnce(() => new Promise((resolve) => {
+      finish = () => resolve(mocks.provider);
+    }));
+
+    // Both the page's fetch and the socket's push land while the sweep runs.
+    const first = getProviders();
+    const second = getProviders();
+    expect(mocks.probe).toHaveBeenCalledTimes(1);
+    finish();
+    expect(await first).toBe(await second);
+
+    // A reconnect a moment later reuses the answer; one later than the TTL does not.
+    vi.setSystemTime(Date.now() + 2_999);
+    await getProviders();
+    expect(mocks.probe).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(Date.now() + 1);
+    await getProviders();
+    expect(mocks.probe).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a sweep in which a probe failed, since the failure is part of the answer", async () => {
+    mocks.probe.mockRejectedValueOnce(new Error("probe failed"));
+    await getProviders();
+    await getProviders();
+    expect(mocks.probe).toHaveBeenCalledTimes(1);
+    expect((await getProviders())[0]).toMatchObject({ installed: false, message: "probe failed" });
   });
 
   it("destroys upgrades from a mismatched or unparsable origin", () => {
