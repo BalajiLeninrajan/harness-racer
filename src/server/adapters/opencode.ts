@@ -8,6 +8,8 @@ import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type Adap
 interface OpenCodeProcess {
   child: ChildProcess;
   url: string;
+  // The tail of what the server has written to stderr so far.
+  stderr: () => string;
   terminate: () => void;
 }
 
@@ -79,7 +81,7 @@ async function startOpenCode(cwd: string): Promise<OpenCodeProcess> {
       reject(new Error(`OpenCode server exited with code ${code}${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
     });
   });
-  return { child, url, terminate };
+  return { child, url, stderr: () => stderr.trim(), terminate };
 }
 
 function parseModelId(value: string): { providerID: string; modelID: string } {
@@ -126,6 +128,7 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
   // Registered before the server is spawned, so a cancel during setup stops
   // the SSE stream and kills the server instead of waiting for session.create.
   const controller = new AbortController();
+  let iterator: AsyncIterator<unknown> | undefined;
   const onAbort = () => {
     controller.abort();
     server?.terminate();
@@ -146,62 +149,82 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
     const sessionId = created.data.id;
     // The SDK counts the first connection as an attempt, so 1 means no
     // reconnects: a server that dies ends the stream instead of being retried
-    // with backoff until the run times out.
-    const subscription = await client.event.subscribe({ directory: input.cwd }, { signal: controller.signal, sseMaxRetryAttempts: 1 });
+    // with backoff until the run times out. The SDK only hands the failure to
+    // onSseError before ending the stream, so it is kept for the error.
+    let sseError: unknown;
+    const subscription = await client.event.subscribe({ directory: input.cwd }, {
+      signal: controller.signal,
+      sseMaxRetryAttempts: 1,
+      onSseError: (error) => { sseError = error; },
+    });
+    const streamFailure = (message: string) => {
+      const details = [
+        ...(sseError !== undefined ? [`stream error: ${sseError instanceof Error ? sseError.message : String(sseError)}`] : []),
+        ...(server?.stderr() ? [`server stderr: ${server.stderr()}`] : []),
+      ];
+      return new Error(`${message}${details.length ? ` (${details.join("; ")})` : ""}`);
+    };
+    // The stream is a lazy generator: nothing connects to /event until it is
+    // first pulled. The server acknowledges a new subscriber with
+    // server.connected, so the first event is the proof that the stream is
+    // live, and any event the prompt produces after this point is delivered.
+    iterator = subscription.stream[Symbol.asyncIterator]();
+    const first = await iterator.next();
+    if (first.done) throw streamFailure("OpenCode event stream could not be opened");
     signalReady();
     await input.waitForStart();
     if (input.signal.aborted) throw abortError();
     const roles = new Map<string, string>();
     const emitted = new Map<string, string>();
     let idle = false;
-    try {
-      const prompt = await client.session.promptAsync({
-        sessionID: sessionId,
-        directory: input.cwd,
-        model,
-        tools: {},
-        parts: [{ type: "text", text: input.prompt }],
-      }, { signal: input.signal });
-      if (prompt.error) throw new Error(`OpenCode prompt failed: ${JSON.stringify(prompt.error)}`);
-      for await (const rawEvent of subscription.stream) {
-        const event = recordFrom(rawEvent);
-        const properties = recordFrom(event?.properties);
-        if (properties?.sessionID !== sessionId) continue;
-        if (event?.type === "message.updated") {
-          const info = recordFrom(properties.info);
-          if (typeof info?.id === "string" && typeof info.role === "string") roles.set(info.id, info.role);
-        }
-        if (event?.type === "message.part.updated") {
-          const part = recordFrom(properties.part);
-          if (part?.type === "text" && typeof part.id === "string" && typeof part.messageID === "string" && roles.get(part.messageID) === "assistant" && typeof part.text === "string") {
-            const prior = emitted.get(part.id) ?? "";
-            const delta = part.text.startsWith(prior) ? part.text.slice(prior.length) : part.text;
-            if (delta) input.onDelta(delta);
-            emitted.set(part.id, part.text);
-          }
-        }
-        if (event?.type === "message.part.delta" && typeof properties.messageID === "string" && roles.get(properties.messageID) === "assistant" && properties.field === "text" && typeof properties.delta === "string") {
-          input.onDelta(properties.delta);
-          if (typeof properties.partID === "string") emitted.set(properties.partID, `${emitted.get(properties.partID) ?? ""}${properties.delta}`);
-        }
-        if (event?.type === "session.error") throw new Error(`OpenCode session failed: ${JSON.stringify(properties.error)}`);
-        if (event?.type === "session.idle") {
-          idle = true;
-          break;
+    const prompt = await client.session.promptAsync({
+      sessionID: sessionId,
+      directory: input.cwd,
+      model,
+      tools: {},
+      parts: [{ type: "text", text: input.prompt }],
+    }, { signal: input.signal });
+    if (prompt.error) throw new Error(`OpenCode prompt failed: ${JSON.stringify(prompt.error)}`);
+    for (let next: IteratorResult<unknown> = first; !next.done; next = await iterator.next()) {
+      const event = recordFrom(next.value);
+      const properties = recordFrom(event?.properties);
+      if (properties?.sessionID !== sessionId) continue;
+      if (event?.type === "message.updated") {
+        const info = recordFrom(properties.info);
+        if (typeof info?.id === "string" && typeof info.role === "string") roles.set(info.id, info.role);
+      }
+      if (event?.type === "message.part.updated") {
+        const part = recordFrom(properties.part);
+        if (part?.type === "text" && typeof part.id === "string" && typeof part.messageID === "string" && roles.get(part.messageID) === "assistant" && typeof part.text === "string") {
+          const prior = emitted.get(part.id) ?? "";
+          const delta = part.text.startsWith(prior) ? part.text.slice(prior.length) : part.text;
+          if (delta) input.onDelta(delta);
+          emitted.set(part.id, part.text);
         }
       }
-      // The stream also ends cleanly on abort and when the server goes away.
-      if (!idle) throw new Error("OpenCode event stream ended before the session went idle");
-      return {};
-    } finally {
-      controller.abort();
+      if (event?.type === "message.part.delta" && typeof properties.messageID === "string" && roles.get(properties.messageID) === "assistant" && properties.field === "text" && typeof properties.delta === "string") {
+        input.onDelta(properties.delta);
+        if (typeof properties.partID === "string") emitted.set(properties.partID, `${emitted.get(properties.partID) ?? ""}${properties.delta}`);
+      }
+      if (event?.type === "session.error") throw new Error(`OpenCode session failed: ${JSON.stringify(properties.error)}`);
+      if (event?.type === "session.idle") {
+        idle = true;
+        break;
+      }
     }
+    // The stream also ends cleanly on abort and when the server goes away.
+    if (!idle) throw streamFailure("OpenCode event stream ended before the session went idle");
+    return {};
   } catch (error) {
     signalReady();
     if (input.signal.aborted) throw abortError();
     throw error;
   } finally {
     input.signal.removeEventListener("abort", onAbort);
+    controller.abort();
+    // Leaving the loop early leaves the generator suspended at a yield;
+    // returning it runs the SDK's cleanup of the response reader.
+    void iterator?.return?.().catch(() => undefined);
     server?.terminate();
   }
 }
