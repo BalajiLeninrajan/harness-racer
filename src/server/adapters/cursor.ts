@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
 import type { ModelOption } from "../../shared/types.js";
-import { outputTokensFrom, recordFrom, stringFrom, stripAnsi, type JsonRecord } from "./lib/json.js";
+import { errorMessage, outputTokensFrom, recordFrom, stringFrom, stripAnsi, type JsonRecord } from "./lib/json.js";
 import { bounded, normalizeModels, notInstalled, probeFailure, type ModelList } from "./lib/probe.js";
 import { runCommand } from "./lib/process.js";
 import { runSession, type SessionPlan } from "./lib/run.js";
@@ -390,7 +390,7 @@ export const cursorAdapter = defineAdapter({
       try {
         listed = await discoverCursorModels(command);
       } catch (error) {
-        modelMessage = error instanceof Error ? error.message : String(error);
+        modelMessage = errorMessage(error);
       }
     }
 

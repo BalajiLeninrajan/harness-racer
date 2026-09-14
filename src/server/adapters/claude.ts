@@ -5,7 +5,7 @@ import type { Readable, Writable } from "node:stream";
 import { startup, type Query, type SpawnOptions, type WarmQuery } from "@anthropic-ai/claude-agent-sdk";
 
 import type { ModelOption } from "../../shared/types.js";
-import { recordFrom } from "./lib/json.js";
+import { errorMessage, recordFrom } from "./lib/json.js";
 import { normalizeModels, probeFailure } from "./lib/probe.js";
 import { runCommand } from "./lib/process.js";
 import { abortError, runSession, type SessionPlan } from "./lib/run.js";
@@ -131,7 +131,7 @@ function discoverClaudeModels(): ModelDiscovery {
     size = stats.size;
     key = `${file}:${stats.size}:${stats.mtimeMs}`;
   } catch (error) {
-    return { models: [], message: `Could not stat ${file}: ${error instanceof Error ? error.message : String(error)}` };
+    return { models: [], message: `Could not stat ${file}: ${errorMessage(error)}` };
   }
   if (discoveryCache?.key === key) return discoveryCache.discovery;
   let discovery: ModelDiscovery;
@@ -139,7 +139,7 @@ function discoverClaudeModels(): ModelDiscovery {
     const models = scanExecutableForModels(file, size);
     discovery = models.length ? { models } : { models, message: `No Claude model ids found in ${file}.` };
   } catch (error) {
-    discovery = { models: [], message: `Could not read models from ${file}: ${error instanceof Error ? error.message : String(error)}` };
+    discovery = { models: [], message: `Could not read models from ${file}: ${errorMessage(error)}` };
   }
   discoveryCache = { key, discovery };
   return discovery;

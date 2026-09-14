@@ -3,7 +3,7 @@ import { createServer } from "node:net";
 import { createOpencodeClient } from "@opencode-ai/sdk/v2";
 
 import type { ModelOption } from "../../shared/types.js";
-import { recordFrom } from "./lib/json.js";
+import { errorMessage, recordFrom } from "./lib/json.js";
 import { bounded, normalizeModels, probeFailure, type ModelList } from "./lib/probe.js";
 import { runCommand } from "./lib/process.js";
 import { abortError, runSession, type SessionPlan } from "./lib/run.js";
@@ -164,7 +164,7 @@ const openCodePlan: SessionPlan<OpenCodeSession, void> = {
     });
     const streamFailure = (message: string) => {
       const details = [
-        ...(sseError !== undefined ? [`stream error: ${sseError instanceof Error ? sseError.message : String(sseError)}`] : []),
+        ...(sseError !== undefined ? [`stream error: ${errorMessage(sseError)}`] : []),
         ...(server.stderr() ? [`server stderr: ${server.stderr()}`] : []),
       ];
       return new Error(`${message}${details.length ? ` (${details.join("; ")})` : ""}`);
