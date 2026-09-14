@@ -170,17 +170,19 @@ describe("Grok adapter", () => {
     expect(processes[1]?.kill).toHaveBeenCalledWith("SIGTERM");
   });
 
-  it("gives up on a handshake that stalls and reports the timeout", async () => {
+  it("gives up on a handshake that stalls and reports the timeout with what the agent said", async () => {
     vi.useFakeTimers();
     try {
       behaviour.hang = ["session/new"];
       const probe = grokAdapter.probe();
       await vi.waitFor(() => expect(processes[1]?.requests.at(-1)?.method).toBe("session/new"));
+      // The stall's only explanation is on stderr; a bare timeout would hide it.
+      processes[1].stderr.emit("data", "\u001b[33mOpen https://accounts.x.ai/login to sign in\u001b[0m\n");
       await vi.advanceTimersByTimeAsync(20_000);
 
       const result = await probe;
 
-      expect(result).toMatchObject({ installed: true, authenticated: null, version: "grok 1.2.3", models: [], message: "Grok ACP handshake did not finish within 20s" });
+      expect(result).toMatchObject({ installed: true, authenticated: null, version: "grok 1.2.3", models: [], message: "Grok ACP handshake did not finish within 20s: Open https://accounts.x.ai/login to sign in" });
       expect(processes[1]?.kill).toHaveBeenCalledWith("SIGTERM");
     } finally {
       vi.useRealTimers();

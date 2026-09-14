@@ -159,6 +159,25 @@ describe("Cursor adapter", () => {
     expect(acp.kill).toHaveBeenCalledWith("SIGTERM");
   });
 
+  it("carries what the agent wrote to stderr in the discovery timeout message", async () => {
+    vi.useFakeTimers();
+    let acp!: FakeChild;
+    mocks.spawn
+      .mockImplementationOnce(() => commandProcess("1.2\n"))
+      .mockImplementationOnce(() => commandProcess('{"loggedIn":true}\n'))
+      .mockImplementationOnce(() => (acp = acpProcess({ initialize: {} }, ["authenticate"])));
+    const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+
+    const probe = cursorAdapter.probe();
+    await vi.waitFor(() => expect(acp.stdin.write).toHaveBeenCalledTimes(2));
+    // The stall's only explanation is on stderr; a bare timeout would hide it.
+    acp.stderr.emit("data", "\u001b[33mOpen https://cursor.com/login to sign in\u001b[0m\n");
+    await vi.advanceTimersByTimeAsync(20_000);
+
+    const result = await probe;
+    expect(result.message).toBe("Cursor ACP model discovery did not finish within 20s: Open https://cursor.com/login to sign in");
+  });
+
   it("reports a status command that never exits instead of hanging the probe", async () => {
     vi.useFakeTimers();
     const stuck = acpProcess({});

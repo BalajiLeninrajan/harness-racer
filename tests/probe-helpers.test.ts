@@ -80,4 +80,13 @@ describe("bounded", () => {
     await result;
     expect(onTimeout).toHaveBeenCalledOnce();
   });
+
+  it("reads a message function at the moment of the timeout, so it can carry what the step wrote so far", async () => {
+    vi.useFakeTimers();
+    let detail = "";
+    const result = expect(bounded(new Promise(() => {}), 1_000, () => `stalled: ${detail}`, () => {})).rejects.toThrow("stalled: waiting for sign-in");
+    detail = "waiting for sign-in";
+    await vi.advanceTimersByTimeAsync(1_000);
+    await result;
+  });
 });

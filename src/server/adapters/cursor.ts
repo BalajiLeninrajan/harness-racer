@@ -152,11 +152,16 @@ class CursorAcpConnection {
     this.child.stdin.on("error", (error) => this.failAll(error));
     this.child.once("close", (code, signal) => {
       this.closed = true;
-      const detail = stripAnsi(this.stderr).trim();
+      const detail = this.stderrTail();
       this.failAll(new Error(
         `Cursor ACP exited with ${signal ? `signal ${signal}` : `code ${code}`}${detail ? `: ${detail}` : ""}`,
       ));
     });
+  }
+
+  /** The last 16 KiB the agent wrote to stderr, ANSI stripped and trimmed. */
+  stderrTail(): string {
+    return stripAnsi(this.stderr).trim();
   }
 
   request(method: string, params: unknown): Promise<unknown> {
@@ -272,11 +277,16 @@ async function discoverCursorModels(command: string): Promise<ModelList> {
   const connection = new CursorAcpConnection(command, process.cwd(), () => {});
   try {
     // request() takes no signal, so the bound ends the process instead; its
-    // close rejects whatever the handshake is waiting on.
+    // close rejects whatever the handshake is waiting on. The agent's stderr
+    // is the only place a stall explains itself (a browser sign-in it is
+    // waiting on, say), so the timeout carries it.
     return await bounded(
       listModels(connection, process.cwd()),
       PROBE_TIMEOUT_MS,
-      `Cursor ACP model discovery did not finish within ${Math.round(PROBE_TIMEOUT_MS / 1000)}s`,
+      () => {
+        const detail = connection.stderrTail();
+        return `Cursor ACP model discovery did not finish within ${Math.round(PROBE_TIMEOUT_MS / 1000)}s${detail ? `: ${detail}` : ""}`;
+      },
       () => connection.terminate(),
     );
   } finally {

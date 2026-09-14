@@ -54,12 +54,13 @@ export function probeFailure(error: unknown, version?: string): AdapterProbeResu
 /**
  * Bounds a probe step. On timeout `onTimeout` tears down whatever the step
  * is waiting on (a kill, a terminate, an abort) so nothing is left running,
- * and the result rejects with `message`.
+ * and the result rejects with `message`. A function is read at the moment
+ * of the timeout, so it can carry what the step wrote before it stalled.
  */
-export function bounded<T>(work: Promise<T>, timeoutMs: number, message: string, onTimeout: () => void): Promise<T> {
+export function bounded<T>(work: Promise<T>, timeoutMs: number, message: string | (() => string), onTimeout: () => void): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error(message));
+      reject(new Error(typeof message === "function" ? message() : message));
       onTimeout();
     }, timeoutMs);
     timer.unref();

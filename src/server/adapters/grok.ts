@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
 import type { ModelOption } from "../../shared/types.js";
-import { outputTokensFrom, recordFrom, stringFrom, type JsonRecord } from "./lib/json.js";
+import { outputTokensFrom, recordFrom, stringFrom, stripAnsi, type JsonRecord } from "./lib/json.js";
 import { bounded, normalizeModels, probeFailure, type ModelList } from "./lib/probe.js";
 import { runCommand } from "./lib/process.js";
 import { abortError, runSession, type SessionPlan } from "./lib/run.js";
@@ -44,8 +44,14 @@ class GrokAcpConnection {
     this.child.stdin.on("error", (error) => this.failAll(error));
     this.child.once("close", (code, signal) => {
       this.closed = true;
-      this.failAll(new Error(`Grok ACP exited with ${signal ? `signal ${signal}` : `code ${code}`}${this.stderr.trim() ? `: ${this.stderr.trim()}` : ""}`));
+      const detail = this.stderrTail();
+      this.failAll(new Error(`Grok ACP exited with ${signal ? `signal ${signal}` : `code ${code}`}${detail ? `: ${detail}` : ""}`));
     });
+  }
+
+  /** The last 16 KiB the agent wrote to stderr, ANSI stripped and trimmed. */
+  stderrTail(): string {
+    return stripAnsi(this.stderr).trim();
   }
 
   request(method: string, params: unknown, signal?: AbortSignal): Promise<unknown> {
@@ -159,10 +165,15 @@ async function discoverGrokModels(): Promise<ModelList> {
   const connection = new GrokAcpConnection(process.cwd(), () => {});
   const deadline = new AbortController();
   try {
+    // The agent's stderr is the only place a stall explains itself (a
+    // browser sign-in it is waiting on, say), so the timeout carries it.
     const started = await bounded(
       openSession(connection, process.cwd(), deadline.signal),
       PROBE_TIMEOUT_MS,
-      `Grok ACP handshake did not finish within ${Math.round(PROBE_TIMEOUT_MS / 1000)}s`,
+      () => {
+        const detail = connection.stderrTail();
+        return `Grok ACP handshake did not finish within ${Math.round(PROBE_TIMEOUT_MS / 1000)}s${detail ? `: ${detail}` : ""}`;
+      },
       () => {
         deadline.abort();
         connection.terminate();
