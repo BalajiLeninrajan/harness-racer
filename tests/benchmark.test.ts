@@ -236,6 +236,27 @@ describe("benchmark engine", () => {
     expect(completed.summary.map((row) => row.competitor.id)).toEqual(["healthy"]);
   });
 
+  it("releases the parallel start barrier when a lane finishes without ever saying it was ready", async () => {
+    // Off-contract, but the engine must not hang on it: a lane that streams
+    // and fulfils without onReady or waitForStart leaves the ready count
+    // short, and the other lane has no timer while it waits at the barrier.
+    const mute: HarnessAdapter = {
+      ...instantAdapter("codex"),
+      async run(input) {
+        input.onDelta(corpusFrom(input.prompt));
+        return {};
+      },
+    };
+    const events: ServerEvent[] = [];
+
+    await runBenchmark(parallelRequest(), [mute, instantAdapter("cursor")], new AbortController().signal, (event) => events.push(event));
+
+    expect(statusesOf(events, "a")).toEqual(["starting", "complete", "starting", "complete"]);
+    expect(statusesOf(events, "b")).toEqual(["starting", "ready", "running", "complete", "starting", "ready", "running", "complete"]);
+    expect(events.filter((event) => event.type === "run.error")).toEqual([]);
+    expect(events.at(-1)?.type).toBe("benchmark.complete");
+  });
+
   it("rejects with the cancel reason when a parallel heat is cancelled", async () => {
     const controller = new AbortController();
     const events: ServerEvent[] = [];

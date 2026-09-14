@@ -89,9 +89,10 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
       },
       waitForStart: async () => {
         // The barrier opens when the last lane is ready or the first lane
-        // fails, and a lane stuck in setup fails on its own setup timer, so a
-        // ready lane carries no timer of its own while it waits here. Its
-        // failure would otherwise be reported as the harness not being ready.
+        // ends, ready or not, and a lane stuck in setup fails on its own setup
+        // timer, so a ready lane carries no timer of its own while it waits
+        // here. Its failure would otherwise be reported as the harness not
+        // being ready.
         clearTimeout(timeout);
         if (input.startGate) await untilAborted(input.startGate, controller.signal);
         if (controller.signal.aborted) throw controller.signal.reason;
@@ -218,9 +219,6 @@ async function runParallel(
           if (readyCount === competitors.length) release();
         },
       }).catch((error) => {
-        // Never strand healthy racers behind the readiness barrier when one
-        // process fails during setup.
-        release();
         // A cancelled lane is not a lane error; the benchmark as a whole is
         // cancelled once every lane has settled.
         if (!signal.aborted) {
@@ -233,7 +231,11 @@ async function runParallel(
           });
         }
         throw error;
-      });
+      })
+        // A lane that ends without ever being ready (failed during setup, or
+        // an adapter that never said so) must not strand the rest behind the
+        // barrier: they carry no timer of their own while they wait there.
+        .finally(release);
     });
 
   const settled = await Promise.allSettled(tasks);
