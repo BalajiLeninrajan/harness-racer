@@ -256,14 +256,14 @@ describe("OpenCode adapter", () => {
     expect(child.kill).toHaveBeenCalledWith("SIGTERM");
   });
 
-  it("rejects malformed model ids after signalling readiness", async () => {
+  it("rejects malformed model ids without signalling readiness", async () => {
     createClientMock.mockReturnValue({});
     const onReady = vi.fn();
     await expect(openCodeAdapter.run({
       cwd: "/tmp", model: "sonnet", prompt: "x", signal: new AbortController().signal,
       onReady, waitForStart: async () => {}, onDelta: vi.fn(),
     })).rejects.toThrow("Invalid OpenCode model id: sonnet");
-    expect(onReady).toHaveBeenCalledOnce();
+    expect(onReady).not.toHaveBeenCalled();
     expect(child.kill).toHaveBeenCalledWith("SIGTERM");
   });
 });

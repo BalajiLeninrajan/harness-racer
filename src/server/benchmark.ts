@@ -10,6 +10,7 @@ import type {
   ServerEvent,
   WorkloadId,
 } from "../shared/types.js";
+import { settledWithin, untilAborted } from "./adapters/lib/run.js";
 import type { AdapterRunOutput, HarnessAdapter } from "./adapters/types.js";
 import { countNormalizedTokens, streamAnomalyMessage, summarizeResults } from "./metrics.js";
 import { validateOutput, workloads } from "./workloads.js";
@@ -26,30 +27,6 @@ const RUN_TIMEOUT_MS = 120_000;
 // Long enough for every adapter to have sent SIGKILL to a child that ignored
 // SIGTERM (Codex: up to 800 ms interrupt, then 1 s; the rest: 1.5 s).
 const TEARDOWN_GRACE_MS = 2_000;
-
-// Settles with the promise, or rejects with the signal's reason as soon as it
-// aborts, so nothing in runOne keeps waiting on an adapter that ignores it.
-function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(signal.reason);
-    if (signal.aborted) onAbort();
-    else signal.addEventListener("abort", onAbort, { once: true });
-    // The promise is observed even when the signal was already aborted: the
-    // caller has started the work, and its rejection must not go unhandled.
-    promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
-  });
-}
-
-// Resolves once the promise settles, or after the grace period if it does not.
-function settledWithin(promise: Promise<unknown>, graceMs: number): Promise<void> {
-  return new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, graceMs);
-    promise.catch(() => undefined).finally(() => {
-      clearTimeout(timer);
-      resolve();
-    });
-  });
-}
 
 interface RunOneInput {
   competitor: Competitor;
@@ -87,9 +64,9 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
   let readySignalled = false;
   let settled = false;
   // Adapters keep running for a while after the lane gave up on them (a
-  // timed-out or cancelled child gets a grace period before SIGKILL, and
-  // every adapter signals ready from its catch block), and nothing they
-  // report then belongs to this lane, or to a benchmark started since.
+  // timed-out or cancelled child gets a grace period before SIGKILL), and
+  // nothing they report then belongs to this lane, or to a benchmark started
+  // since.
   const closed = () => settled || controller.signal.aborted;
   let adapterRun: Promise<AdapterRunOutput> | undefined;
 

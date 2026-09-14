@@ -1,18 +1,13 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
 import type { ModelOption } from "../../shared/types.js";
+import { abortError, runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 type JsonRecord = Record<string, unknown>;
 
 function recordFrom(value: unknown): JsonRecord | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : undefined;
-}
-
-function abortError(): Error {
-  const error = new Error("Benchmark cancelled");
-  error.name = "AbortError";
-  return error;
 }
 
 function outputTokensFrom(value: unknown): number | undefined {
@@ -179,54 +174,39 @@ async function discoverGrokModels(): Promise<{ models: ModelOption[]; defaultMod
   }
 }
 
-async function runGrok(input: AdapterRunInput): Promise<AdapterRunOutput> {
-  if (input.signal.aborted) throw abortError();
-  let sessionId: string | undefined;
-  let connection: GrokAcpConnection | undefined;
-  let ready = false;
-  const signalReady = () => {
-    if (!ready) {
-      ready = true;
-      input.onReady();
-    }
-  };
-  try {
-    connection = new GrokAcpConnection(input.cwd, (method, params) => {
+interface GrokSession {
+  connection: GrokAcpConnection;
+  sessionId: string;
+}
+
+const grokPlan: SessionPlan<GrokSession> = {
+  async open(ctx) {
+    let sessionId: string | undefined;
+    const connection = new GrokAcpConnection(ctx.cwd, (method, params) => {
       if (method !== "session/update") return;
       const notification = recordFrom(params);
       if (sessionId && notification?.sessionId !== sessionId) return;
       const update = recordFrom(notification?.update);
       const content = recordFrom(update?.content);
-      if (update?.sessionUpdate === "agent_message_chunk" && content?.type === "text" && typeof content.text === "string" && content.text) input.onDelta(content.text);
+      if (update?.sessionUpdate === "agent_message_chunk" && content?.type === "text" && typeof content.text === "string" && content.text) ctx.onDelta(content.text);
     });
     // Registered before the first handshake byte, so a cancel or timeout
     // reaches a grok that stalls in authenticate.
-    const onAbort = () => {
-      if (sessionId) connection?.notify("session/cancel", { sessionId });
-      connection?.terminate();
-    };
-    input.signal.addEventListener("abort", onAbort, { once: true });
-    try {
-      const started = await openSession(connection, input.cwd, input.signal);
-      sessionId = started.sessionId;
-      const current = recordFrom(recordFrom(started.session)?.models)?.currentModelId;
-      if (current !== input.model) await connection.request("session/set_model", { sessionId, modelId: input.model }, input.signal);
-      signalReady();
-      await input.waitForStart();
-      if (input.signal.aborted) throw abortError();
-      const result = await connection.request("session/prompt", { sessionId, prompt: [{ type: "text", text: input.prompt }] }, input.signal);
-      const nativeOutputTokens = outputTokensFrom(result);
-      return nativeOutputTokens === undefined ? {} : { nativeOutputTokens };
-    } finally {
-      input.signal.removeEventListener("abort", onAbort);
-    }
-  } catch (error) {
-    signalReady();
-    if (input.signal.aborted) throw abortError();
-    throw error;
-  } finally {
-    connection?.terminate();
-  }
+    ctx.onCleanup(() => connection.terminate());
+    const started = await openSession(connection, ctx.cwd, ctx.signal);
+    sessionId = started.sessionId;
+    const current = recordFrom(recordFrom(started.session)?.models)?.currentModelId;
+    if (current !== ctx.model) await connection.request("session/set_model", { sessionId, modelId: ctx.model }, ctx.signal);
+    return { connection, sessionId };
+  },
+  prompt: ({ connection, sessionId }, text, signal) =>
+    connection.request("session/prompt", { sessionId, prompt: [{ type: "text", text }] }, signal),
+  cancel: ({ connection, sessionId }) => connection.notify("session/cancel", { sessionId }),
+  tokens: outputTokensFrom,
+};
+
+function runGrok(input: AdapterRunInput): Promise<AdapterRunOutput> {
+  return runSession(input, grokPlan);
 }
 
 export const grokAdapter = defineAdapter({

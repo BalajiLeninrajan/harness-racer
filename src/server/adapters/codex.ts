@@ -2,6 +2,7 @@ import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child
 import { createInterface, type Interface as ReadlineInterface } from "node:readline";
 
 import type { ModelOption } from "../../shared/types.js";
+import { runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 const COMMAND = "codex";
@@ -415,6 +416,129 @@ async function interruptTurn(client: CodexRpcClient, threadId: string, turnId: s
   ]);
 }
 
+interface CodexSession {
+  client: CodexRpcClient;
+  threadId: string;
+  model: string;
+  onDelta: (text: string) => void;
+  // Set once turn/start answers; what turn/interrupt needs on cancel.
+  turnId?: string;
+}
+
+const codexPlan: SessionPlan<CodexSession, number | undefined> = {
+  async open(ctx) {
+    const client = await CodexRpcClient.start(ctx.cwd);
+    ctx.onCleanup(() => client.close());
+    await initialize(client);
+    const opened = await client.request<JsonObject>(
+      "thread/start",
+      {
+        cwd: ctx.cwd,
+        model: ctx.model,
+        ephemeral: true,
+        approvalPolicy: "never",
+        sandbox: "read-only",
+        developerInstructions:
+          "This is a text streaming benchmark. Do not call tools or inspect files. Return only the text requested by the user.",
+      },
+      { signal: ctx.signal },
+    );
+    const thread = isObject(opened.thread) ? opened.thread : undefined;
+    const threadId = asString(thread?.id);
+    if (!threadId) throw new Error("Codex app-server did not return a thread id");
+    return { client, threadId, model: ctx.model, onDelta: ctx.onDelta };
+  },
+
+  // Resolves with the output-token count the app-server reported for the turn.
+  async prompt(session, text, signal) {
+    const { client, threadId } = session;
+    let nativeOutputTokens: number | undefined;
+    let resolveCompletion!: () => void;
+    let rejectCompletion!: (error: Error) => void;
+    const completion = new Promise<void>((resolve, reject) => {
+      resolveCompletion = resolve;
+      rejectCompletion = reject;
+    });
+    void completion.catch(() => undefined);
+
+    const removeTerminationListener = client.onTermination(rejectCompletion);
+    const removeNotificationListener = client.onNotification((method, rawParams) => {
+      if (!isObject(rawParams)) return;
+      const eventThreadId = asString(rawParams.threadId);
+      if (eventThreadId && eventThreadId !== threadId) return;
+
+      if (method === "item/agentMessage/delta") {
+        const eventTurnId = asString(rawParams.turnId);
+        if (session.turnId && eventTurnId && eventTurnId !== session.turnId) return;
+        const delta = asString(rawParams.delta);
+        if (delta) session.onDelta(delta);
+        return;
+      }
+
+      if (method === "thread/tokenUsage/updated") {
+        const eventTurnId = asString(rawParams.turnId);
+        if (session.turnId && eventTurnId && eventTurnId !== session.turnId) return;
+        const usage = isObject(rawParams.tokenUsage) ? rawParams.tokenUsage : undefined;
+        const last = usage && isObject(usage.last) ? usage.last : undefined;
+        if (typeof last?.outputTokens === "number") nativeOutputTokens = last.outputTokens;
+        return;
+      }
+
+      if (method === "error" && rawParams.willRetry !== true) {
+        const details = isObject(rawParams.error) ? rawParams.error : rawParams;
+        rejectCompletion(new Error(asString(details.message) ?? "Codex turn failed"));
+        return;
+      }
+
+      if (method !== "turn/completed") return;
+      const turn = isObject(rawParams.turn) ? rawParams.turn : undefined;
+      const completedTurnId = asString(turn?.id);
+      if (session.turnId && completedTurnId && completedTurnId !== session.turnId) return;
+      const status = asString(turn?.status);
+      if (status === "completed") {
+        resolveCompletion();
+        return;
+      }
+      const turnError = turn && isObject(turn.error) ? turn.error : undefined;
+      rejectCompletion(
+        new Error(asString(turnError?.message) ?? `Codex turn ${status ?? "failed"}`),
+      );
+    });
+
+    try {
+      const started = await client.request<JsonObject>(
+        "turn/start",
+        codexTurnStartParams(
+          threadId,
+          session.model,
+          text,
+          reasoningEffortByModel.get(session.model) ?? "medium",
+        ),
+        { signal, timeoutMs: RUN_TIMEOUT_MS },
+      );
+      const turn = isObject(started.turn) ? started.turn : undefined;
+      session.turnId = asString(turn?.id);
+      if (!session.turnId) throw new Error("Codex app-server did not return a turn id");
+
+      await raceWithSignalAndTimeout(completion, signal, RUN_TIMEOUT_MS, "Codex benchmark turn timed out");
+      return nativeOutputTokens;
+    } finally {
+      removeNotificationListener();
+      removeTerminationListener();
+    }
+  },
+
+  async cancel({ client, threadId, turnId }) {
+    if (turnId) await interruptTurn(client, threadId, turnId);
+  },
+
+  tokens: (outputTokens) => outputTokens,
+};
+
+function runCodex(input: AdapterRunInput): Promise<AdapterRunOutput> {
+  return runSession(input, codexPlan);
+}
+
 export const codexAdapter = defineAdapter({
   id: "codex",
   name: "Codex",
@@ -456,124 +580,7 @@ export const codexAdapter = defineAdapter({
     }
   },
 
-  async run(input: AdapterRunInput): Promise<AdapterRunOutput> {
-    if (input.signal.aborted) throw makeAbortError();
-    const client = await CodexRpcClient.start(input.cwd);
-    let threadId: string | undefined;
-    let turnId: string | undefined;
-    let nativeOutputTokens: number | undefined;
-    let removeNotificationListener: () => void = () => undefined;
-    let removeTerminationListener: () => void = () => undefined;
-
-    try {
-      await initialize(client);
-      const opened = await client.request<JsonObject>(
-        "thread/start",
-        {
-          cwd: input.cwd,
-          model: input.model,
-          ephemeral: true,
-          approvalPolicy: "never",
-          sandbox: "read-only",
-          developerInstructions:
-            "This is a text streaming benchmark. Do not call tools or inspect files. Return only the text requested by the user.",
-        },
-        { signal: input.signal },
-      );
-      const thread = isObject(opened.thread) ? opened.thread : undefined;
-      threadId = asString(thread?.id);
-      if (!threadId) throw new Error("Codex app-server did not return a thread id");
-
-      input.onReady();
-      await raceWithSignalAndTimeout(
-        input.waitForStart(),
-        input.signal,
-        RUN_TIMEOUT_MS,
-        "Timed out waiting for the benchmark start barrier",
-      );
-
-      let resolveCompletion!: () => void;
-      let rejectCompletion!: (error: Error) => void;
-      const completion = new Promise<void>((resolve, reject) => {
-        resolveCompletion = resolve;
-        rejectCompletion = reject;
-      });
-      void completion.catch(() => undefined);
-
-      removeTerminationListener = client.onTermination(rejectCompletion);
-      removeNotificationListener = client.onNotification((method, rawParams) => {
-        if (!isObject(rawParams)) return;
-        const eventThreadId = asString(rawParams.threadId);
-        if (eventThreadId && eventThreadId !== threadId) return;
-
-        if (method === "item/agentMessage/delta") {
-          const eventTurnId = asString(rawParams.turnId);
-          if (turnId && eventTurnId && eventTurnId !== turnId) return;
-          const delta = asString(rawParams.delta);
-          if (delta) input.onDelta(delta);
-          return;
-        }
-
-        if (method === "thread/tokenUsage/updated") {
-          const eventTurnId = asString(rawParams.turnId);
-          if (turnId && eventTurnId && eventTurnId !== turnId) return;
-          const usage = isObject(rawParams.tokenUsage) ? rawParams.tokenUsage : undefined;
-          const last = usage && isObject(usage.last) ? usage.last : undefined;
-          if (typeof last?.outputTokens === "number") nativeOutputTokens = last.outputTokens;
-          return;
-        }
-
-        if (method === "error" && rawParams.willRetry !== true) {
-          const details = isObject(rawParams.error) ? rawParams.error : rawParams;
-          rejectCompletion(new Error(asString(details.message) ?? "Codex turn failed"));
-          return;
-        }
-
-        if (method !== "turn/completed") return;
-        const turn = isObject(rawParams.turn) ? rawParams.turn : undefined;
-        const completedTurnId = asString(turn?.id);
-        if (turnId && completedTurnId && completedTurnId !== turnId) return;
-        const status = asString(turn?.status);
-        if (status === "completed") {
-          resolveCompletion();
-          return;
-        }
-        const turnError = turn && isObject(turn.error) ? turn.error : undefined;
-        rejectCompletion(
-          new Error(asString(turnError?.message) ?? `Codex turn ${status ?? "failed"}`),
-        );
-      });
-
-      const started = await client.request<JsonObject>(
-        "turn/start",
-        codexTurnStartParams(
-          threadId,
-          input.model,
-          input.prompt,
-          reasoningEffortByModel.get(input.model) ?? "medium",
-        ),
-        { signal: input.signal, timeoutMs: RUN_TIMEOUT_MS },
-      );
-      const turn = isObject(started.turn) ? started.turn : undefined;
-      turnId = asString(turn?.id);
-      if (!turnId) throw new Error("Codex app-server did not return a turn id");
-
-      await raceWithSignalAndTimeout(
-        completion,
-        input.signal,
-        RUN_TIMEOUT_MS,
-        "Codex benchmark turn timed out",
-      );
-      return nativeOutputTokens === undefined ? {} : { nativeOutputTokens };
-    } catch (error) {
-      if (threadId && turnId && input.signal.aborted) await interruptTurn(client, threadId, turnId);
-      throw error;
-    } finally {
-      removeNotificationListener();
-      removeTerminationListener();
-      client.close();
-    }
-  },
+  run: runCodex,
 });
 
 export default codexAdapter;

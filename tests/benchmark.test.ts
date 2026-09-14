@@ -222,6 +222,11 @@ describe("benchmark engine", () => {
     // The failure is reported when it happens, not after the slowest lane finishes.
     expect(events.findIndex((event) => event.type === "run.error"))
       .toBeLessThan(events.findIndex((event) => event.type === "run.complete"));
+    // A lane that failed before it was ready is never reported as ready: the
+    // adapter does not have to call onReady for the barrier to be released,
+    // and a ready status here would be measured as harness prep.
+    expect(statusesOf(events, "broken")).toEqual(["starting", "starting"]);
+    expect(statusesOf(events, "healthy")).toEqual(["starting", "ready", "running", "complete", "starting", "ready", "running", "complete"]);
 
     const completed = events.find((event) => event.type === "benchmark.complete");
     expect(completed?.type).toBe("benchmark.complete");
@@ -281,8 +286,8 @@ describe("benchmark engine", () => {
   it("drops what an adapter reports after its lane was cancelled", async () => {
     const controller = new AbortController();
     const events: ServerEvent[] = [];
-    // After the cancel the adapter behaves like a real one winding down: it
-    // signals ready from its catch block and flushes output it still had.
+    // After the cancel the adapter misbehaves the way a winding-down process
+    // can: it flushes output it still had and repeats its ready signal.
     const adapter: HarnessAdapter = {
       ...stallingAdapter("codex"),
       async run(input) {

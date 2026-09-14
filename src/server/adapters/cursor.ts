@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
 import type { ModelOption } from "../../shared/types.js";
+import { runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 const CURSOR_COMMANDS = ["agent", "cursor-agent"] as const;
@@ -14,12 +15,6 @@ interface CommandResult {
   code: number | null;
   stdout: string;
   stderr: string;
-}
-
-function abortError(): Error {
-  const error = new Error("Benchmark cancelled");
-  error.name = "AbortError";
-  return error;
 }
 
 function stripAnsi(value: string): string {
@@ -339,20 +334,16 @@ async function discoverCursorModels(): Promise<CursorDiscovery> {
   }
 }
 
-async function runCursor(input: AdapterRunInput): Promise<AdapterRunOutput> {
-  if (input.signal.aborted) throw abortError();
-  let readySignaled = false;
-  let sessionId: string | undefined;
-  let connection: CursorAcpConnection | undefined;
-  const signalReady = () => {
-    if (readySignaled) return;
-    readySignaled = true;
-    input.onReady();
-  };
+interface CursorSession {
+  connection: CursorAcpConnection;
+  sessionId: string;
+}
 
-  try {
+const cursorPlan: SessionPlan<CursorSession> = {
+  async open(ctx) {
     const command = await cursorCommand();
-    connection = new CursorAcpConnection(command, input.cwd, (method, params) => {
+    let sessionId: string | undefined;
+    const connection = new CursorAcpConnection(command, ctx.cwd, (method, params) => {
       if (method !== "session/update" || !params || typeof params !== "object") return;
       const notification = params as JsonRecord;
       if (sessionId && notification.sessionId !== sessionId) return;
@@ -360,85 +351,69 @@ async function runCursor(input: AdapterRunInput): Promise<AdapterRunOutput> {
       const update = notification.update as JsonRecord;
       if (update.sessionUpdate !== "agent_message_chunk" || !update.content || typeof update.content !== "object") return;
       const content = update.content as JsonRecord;
-      if (content.type === "text" && typeof content.text === "string" && content.text) input.onDelta(content.text);
+      if (content.type === "text" && typeof content.text === "string" && content.text) ctx.onDelta(content.text);
     });
+    ctx.onCleanup(() => connection.terminate());
 
-    const onAbort = () => {
-      if (sessionId) connection?.notify("session/cancel", { sessionId });
-      connection?.terminate();
-    };
-    input.signal.addEventListener("abort", onAbort, { once: true });
-    try {
-      await connection.request("initialize", {
-        protocolVersion: 1,
-        clientCapabilities: {
-          fs: { readTextFile: false, writeTextFile: false },
-          terminal: false,
-          _meta: { parameterizedModelPicker: true },
-        },
-        clientInfo: { name: "harness-racer", version: "0.1.0" },
-      });
-      await connection.request("authenticate", { methodId: "cursor_login" });
-      const created = await connection.request("session/new", { cwd: input.cwd, mcpServers: [] });
-      if (!created || typeof created !== "object" || typeof (created as JsonRecord).sessionId !== "string") {
-        throw new Error("Cursor ACP session/new returned no sessionId");
-      }
-      sessionId = (created as JsonRecord).sessionId as string;
-      if (input.model === "auto" || input.model === "default") {
-        throw new Error("Cursor Auto is dynamic and cannot be used for an attributable speed benchmark. Select a concrete model.");
-      }
-      const modelConfig = findConfigOption(created, "model");
-      const modelConfigId = typeof modelConfig?.id === "string" && modelConfig.id.trim()
-        ? modelConfig.id.trim()
-        : "model";
-      const availableModels = configOptionValues(modelConfig);
-      if (availableModels.length > 0 && !availableModels.includes(input.model)) {
-        throw new Error(`Cursor ACP does not advertise model ${input.model}. Refresh the model list and choose a concrete model.`);
-      }
-      let configured: unknown;
-      try {
-        configured = await connection.request("session/set_config_option", {
-          sessionId,
-          configId: modelConfigId,
-          value: input.model,
-        });
-      } catch (error) {
-        throw new Error(`Cursor could not select model ${input.model}`, { cause: error });
-      }
-      const selectedValue = currentConfigValue(findConfigOption(configured, "model"));
-      if (selectedValue && selectedValue !== input.model) {
-        throw new Error(`Cursor selected ${selectedValue} instead of requested model ${input.model}`);
-      }
-      try {
-        await connection.request("session/set_config_option", {
-          sessionId,
-          configId: "mode",
-          value: "ask",
-        });
-      } catch (error) {
-        throw new Error("Cursor could not enter read-only ask mode", { cause: error });
-      }
-
-      signalReady();
-      await input.waitForStart();
-      if (input.signal.aborted) throw abortError();
-
-      const result = await connection.request("session/prompt", {
-        sessionId,
-        prompt: [{ type: "text", text: input.prompt }],
-      });
-      const nativeOutputTokens = outputTokensFrom(result);
-      return nativeOutputTokens === undefined ? {} : { nativeOutputTokens };
-    } finally {
-      input.signal.removeEventListener("abort", onAbort);
+    await connection.request("initialize", {
+      protocolVersion: 1,
+      clientCapabilities: {
+        fs: { readTextFile: false, writeTextFile: false },
+        terminal: false,
+        _meta: { parameterizedModelPicker: true },
+      },
+      clientInfo: { name: "harness-racer", version: "0.1.0" },
+    });
+    await connection.request("authenticate", { methodId: "cursor_login" });
+    const created = await connection.request("session/new", { cwd: ctx.cwd, mcpServers: [] });
+    if (!created || typeof created !== "object" || typeof (created as JsonRecord).sessionId !== "string") {
+      throw new Error("Cursor ACP session/new returned no sessionId");
     }
-  } catch (error) {
-    signalReady();
-    if (input.signal.aborted) throw abortError();
-    throw error;
-  } finally {
-    connection?.terminate();
-  }
+    sessionId = (created as JsonRecord).sessionId as string;
+    if (ctx.model === "auto" || ctx.model === "default") {
+      throw new Error("Cursor Auto is dynamic and cannot be used for an attributable speed benchmark. Select a concrete model.");
+    }
+    const modelConfig = findConfigOption(created, "model");
+    const modelConfigId = typeof modelConfig?.id === "string" && modelConfig.id.trim()
+      ? modelConfig.id.trim()
+      : "model";
+    const availableModels = configOptionValues(modelConfig);
+    if (availableModels.length > 0 && !availableModels.includes(ctx.model)) {
+      throw new Error(`Cursor ACP does not advertise model ${ctx.model}. Refresh the model list and choose a concrete model.`);
+    }
+    let configured: unknown;
+    try {
+      configured = await connection.request("session/set_config_option", {
+        sessionId,
+        configId: modelConfigId,
+        value: ctx.model,
+      });
+    } catch (error) {
+      throw new Error(`Cursor could not select model ${ctx.model}`, { cause: error });
+    }
+    const selectedValue = currentConfigValue(findConfigOption(configured, "model"));
+    if (selectedValue && selectedValue !== ctx.model) {
+      throw new Error(`Cursor selected ${selectedValue} instead of requested model ${ctx.model}`);
+    }
+    try {
+      await connection.request("session/set_config_option", {
+        sessionId,
+        configId: "mode",
+        value: "ask",
+      });
+    } catch (error) {
+      throw new Error("Cursor could not enter read-only ask mode", { cause: error });
+    }
+    return { connection, sessionId };
+  },
+  prompt: ({ connection, sessionId }, text) =>
+    connection.request("session/prompt", { sessionId, prompt: [{ type: "text", text }] }),
+  cancel: ({ connection, sessionId }) => connection.notify("session/cancel", { sessionId }),
+  tokens: outputTokensFrom,
+};
+
+function runCursor(input: AdapterRunInput): Promise<AdapterRunOutput> {
+  return runSession(input, cursorPlan);
 }
 
 export const cursorAdapter = defineAdapter({
