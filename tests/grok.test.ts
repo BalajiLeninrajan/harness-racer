@@ -5,7 +5,7 @@ const { spawnMock, processes, behaviour } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
   processes: [] as FakeProcess[],
   // Requests the fake agent leaves unanswered or answers with an error.
-  behaviour: { hang: [] as string[], fail: [] as string[] },
+  behaviour: { hang: [] as string[], fail: [] as string[], currentModelId: "grok-fast" },
 }));
 
 vi.mock("node:child_process", () => ({ spawn: spawnMock }));
@@ -35,7 +35,7 @@ class FakeProcess extends EventEmitter {
         result = {
           sessionId: "session-1",
           models: {
-            currentModelId: "grok-fast",
+            currentModelId: behaviour.currentModelId,
             availableModels: [
               { modelId: "grok-fast", name: "Grok Fast" },
               { modelId: "grok-build", name: "Grok Build" },
@@ -66,6 +66,7 @@ describe("Grok adapter", () => {
     processes.length = 0;
     behaviour.hang = [];
     behaviour.fail = [];
+    behaviour.currentModelId = "grok-fast";
     spawnMock.mockReset();
     spawnMock.mockImplementation((_command: string, args: string[]) => {
       const child = new FakeProcess();
@@ -93,6 +94,20 @@ describe("Grok adapter", () => {
       ],
     });
     expect(spawnMock).toHaveBeenCalledWith("grok", ["agent", "stdio"], expect.objectContaining({ shell: false }));
+  });
+
+  it("picks a listed model when the session's current model is not among the available ones", async () => {
+    behaviour.currentModelId = "gone";
+
+    const result = await grokAdapter.probe();
+
+    // A default the run path would refuse is worse than none; the first
+    // listed model stands in and is the only one flagged.
+    expect(result).toMatchObject({ installed: true, authenticated: true, defaultModel: "grok-fast" });
+    expect(result.models).toEqual([
+      { id: "grok-fast", label: "Grok Fast", isDefault: true },
+      { id: "grok-build", label: "Grok Build" },
+    ]);
   });
 
   it("streams ACP text, switches models, and reports native token usage", async () => {
