@@ -58,14 +58,19 @@ export const ordinal = (rank: number) => {
 const providerModel = (provider: ProviderInfo) =>
   provider.defaultModel ?? provider.models.find((model) => model.isDefault)?.id ?? provider.models[0]?.id ?? "default";
 
-export function makeCompetitor(provider: ProviderInfo, index: number): Competitor {
+export function nextColor(current: readonly Competitor[]): string {
+  const taken = new Set(current.map((competitor) => competitor.color));
+  return COLORS.find((color) => !taken.has(color)) ?? COLORS[current.length % COLORS.length];
+}
+
+export function makeCompetitor(provider: ProviderInfo, current: readonly Competitor[]): Competitor {
   const model = providerModel(provider);
   return {
     id: crypto.randomUUID(),
     harness: provider.id,
     model,
     label: provider.models.find((option) => option.id === model)?.label ?? model,
-    color: COLORS[index % COLORS.length],
+    color: nextColor(current),
   };
 }
 
@@ -73,7 +78,11 @@ function defaultCompetitors(providers: ProviderInfo[]): Competitor[] {
   const runnable = providers.filter((provider) => provider.installed && provider.authenticated !== false && provider.models.length > 0);
   if (!runnable.length) return [];
   const count = Math.min(3, Math.max(2, runnable.length));
-  return Array.from({ length: count }, (_, index) => makeCompetitor(runnable[index % runnable.length], index));
+  const competitors: Competitor[] = [];
+  for (let index = 0; index < count; index += 1) {
+    competitors.push(makeCompetitor(runnable[index % runnable.length], competitors));
+  }
+  return competitors;
 }
 
 export function reconcileCompetitors(current: Competitor[], providers: ProviderInfo[]): Competitor[] {
@@ -84,7 +93,7 @@ export function reconcileCompetitors(current: Competitor[], providers: ProviderI
   return current.map((competitor, index) => {
     const provider = providerMap.get(competitor.harness);
     if (provider?.models.some((model) => model.id === competitor.model)) return competitor;
-    const replacement = makeCompetitor(runnable[index % runnable.length], index);
+    const replacement = makeCompetitor(runnable[index % runnable.length], current);
     return { ...replacement, id: competitor.id, color: competitor.color };
   });
 }

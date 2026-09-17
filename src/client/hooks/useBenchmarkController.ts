@@ -241,7 +241,7 @@ export function useBenchmarkController() {
     if (competitors.length >= 6 || !runnableProviders.length) return;
     const used = new Set(competitors.map((competitor) => competitor.harness));
     const provider = runnableProviders.find((candidate) => !used.has(candidate.id)) ?? runnableProviders[competitors.length % runnableProviders.length];
-    setCompetitors((current) => [...current, makeCompetitor(provider, current.length)]);
+    setCompetitors((current) => [...current, makeCompetitor(provider, current)]);
   }
 
   function removeCompetitor(id: string) {
