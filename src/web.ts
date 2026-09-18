@@ -27,7 +27,19 @@ export async function runWeb(options: WebOptions): Promise<void> {
 
   const currentDir = dirname(fileURLToPath(import.meta.url));
   const staticDir = resolve(currentDir, "client");
-  const staticHandler = sirv(staticDir, { single: true, dev: false });
+  // Hashed assets can live in the browser cache forever. Everything else,
+  // index.html above all, must revalidate on every load, or a browser that
+  // saw an older release keeps running its bundle after an upgrade.
+  const staticHandler = sirv(staticDir, {
+    single: true,
+    dev: false,
+    setHeaders(res, pathname) {
+      res.setHeader(
+        "cache-control",
+        pathname.startsWith("/assets/") ? "public,max-age=31536000,immutable" : "no-cache",
+      );
+    },
+  });
 
   const server = createServer((req, res) => {
     void handleApi(req, res).then((handled) => {
