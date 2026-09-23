@@ -18,12 +18,9 @@ export function ResultsPage({ competitors, results, summary, onEditGrid, onRaceA
 
   return (
     <section className="page-main page-enter" style={{ "--page-width": "1120px" } as CSSProperties}>
-      <div className="cn-mb-22">
-        <div>
-          <div className="eyebrow"><Flag size={14} /> CHECKERED FLAG</div>
-          <h1 className="cn-display cn-m-0">Photo finish.</h1>
-          <p className="cn-copy cn-mt-12 cn-mb-0">Median harness + model result across valid paper and Python runs.</p>
-        </div>
+      <div className="cn-mb-24">
+        <h1 className="cn-display">Photo finish.</h1>
+        <p className="cn-copy cn-mt-12 cn-mb-0">Median harness + model result across valid paper and Python runs.</p>
       </div>
 
       {eligibleSummary.length >= 3 && (
@@ -51,21 +48,21 @@ export function ResultsPage({ competitors, results, summary, onEditGrid, onRaceA
 
       {summary.length > 0 && (
         <div className="results-table panel">
-          <div className="panel-heading table-title"><div className="cn-row cn-text-mauve"><Flag size={18} /><h2>Full classification</h2></div><span className="cn-meta">{results.filter((result) => result.valid && !result.warmup).length} valid runs{summary.some((row) => row.disqualified) ? ` · ${summary.filter((row) => row.disqualified).length} DSQ` : ""}</span></div>
+          <div className="panel-header table-title"><div className="cn-row cn-text-mauve"><Flag size={18} /><h2>Full classification</h2></div><span className="cn-meta">{results.filter((result) => result.valid && !result.warmup).length} valid runs{summary.some((row) => row.disqualified) ? ` · ${summary.filter((row) => row.disqualified).length} DSQ` : ""}</span></div>
           <div className="table-scroll">
-            <table className="table-neu">
+            <table className="data-table">
               <caption className="cn-sr-only">Harness and model stacks with disqualified racers listed after ranked finishers</caption>
               <thead><tr><th scope="col">Place</th><th scope="col">Harness + model</th><th scope="col">Prompt → first</th><th scope="col">Cold start → first</th><th scope="col">Visible tok/s</th><th scope="col">Prompt → finish</th><th scope="col">Runs</th></tr></thead>
               <tbody>
                 {summary.map((row) => (
                   <tr className={row.disqualified ? "disqualified" : row.anomalousRuns > 0 ? "has-anomalies" : undefined} key={row.competitor.id}>
                     <td><span className={`position-badge ${row.disqualified ? "position-dsq" : `position-${row.finishRank}`}`}>{row.disqualified ? "DSQ" : row.finishRank}</span></td>
-                    <td><div className="table-racer cn-row"><span className="table-lane-swatch" style={{ background: row.competitor.color }} /><ModelMark harness={row.competitor.harness} model={row.competitor.model} /><div className="cell-name cn-grow cn-stack cn-gap-4"><strong className="cn-truncate">{row.competitor.label}</strong><small className="cn-code-meta cn-truncate">{row.competitor.model}</small>{row.anomalousRuns > 0 && <span className={`chip-tone cn-fit ${row.disqualified ? "cn-tone-red" : "cn-tone-peach"}`}>{row.disqualified ? "all runs anomalous" : `${row.anomalousRuns} anomalous ${row.anomalousRuns === 1 ? "run" : "runs"}`}</span>}</div></div></td>
-                    <td data-label="PROMPT → FIRST" className={row.crowns.includes("firstOutput") ? "crowned" : ""}>{formatMs(row.promptToFirstOutputMs)}{row.crowns.includes("firstOutput") && <span className="best-chip">best</span>}</td>
-                    <td data-label="COLD → FIRST" className={row.crowns.includes("coldStart") ? "crowned" : ""}>{formatMs(row.coldStartToFirstOutputMs)}{row.crowns.includes("coldStart") && <span className="best-chip">best</span>}</td>
-                    <td data-label="VISIBLE TOK/S" className={row.crowns.includes("visibleSpeed") ? "crowned" : ""}>{formatVisibleRate(row.visibleTokensPerSecond)}{row.crowns.includes("visibleSpeed") && <span className="best-chip">best</span>}</td>
-                    <td data-label="PROMPT → FINISH" className={row.crowns.includes("finish") ? "crowned" : ""}>{formatMs(row.promptToFinishMs)}{row.crowns.includes("finish") && <span className="best-chip">best</span>}</td>
-                    <td data-label="RUNS"><span className="well cn-bg-well cn-r-mark cn-p-4 cn-px-8">{row.anomalousRuns > 0 ? `${row.validRuns}/${row.measuredRuns}` : row.measuredRuns}</span></td>
+                    <td><div className="table-racer cn-row"><span className="table-lane-swatch" style={{ background: row.competitor.color }} /><ModelMark harness={row.competitor.harness} model={row.competitor.model} /><div className="cell-name cn-grow cn-stack cn-gap-4"><strong className="cn-truncate">{row.competitor.label}</strong><small className="cn-code-meta cn-truncate">{row.competitor.model}</small>{row.anomalousRuns > 0 && <span className={`tag cn-fit ${row.disqualified ? "cn-tone-red" : "cn-tone-peach"}`}>{row.disqualified ? "all runs anomalous" : `${row.anomalousRuns} anomalous ${row.anomalousRuns === 1 ? "run" : "runs"}`}</span>}</div></div></td>
+                    <td data-label="Prompt → first">{formatMs(row.promptToFirstOutputMs)}{row.crowns.includes("firstOutput") && <span className="tag cn-tone-yellow best-tag">Best</span>}</td>
+                    <td data-label="Cold → first">{formatMs(row.coldStartToFirstOutputMs)}{row.crowns.includes("coldStart") && <span className="tag cn-tone-yellow best-tag">Best</span>}</td>
+                    <td data-label="Visible tok/s">{formatVisibleRate(row.visibleTokensPerSecond)}{row.crowns.includes("visibleSpeed") && <span className="tag cn-tone-yellow best-tag">Best</span>}</td>
+                    <td data-label="Prompt → finish">{formatMs(row.promptToFinishMs)}{row.crowns.includes("finish") && <span className="tag cn-tone-yellow best-tag">Best</span>}</td>
+                    <td data-label="Runs">{row.anomalousRuns > 0 ? `${row.validRuns}/${row.measuredRuns}` : row.measuredRuns}</td>
                   </tr>
                 ))}
               </tbody>
@@ -98,7 +95,7 @@ export function ResultsPage({ competitors, results, summary, onEditGrid, onRaceA
         </div>
       )}
 
-      <div className="results-actions cn-row cn-center cn-mt-22">
+      <div className="results-actions cn-row cn-center cn-mt-24">
         <button className="btn btn-secondary" onClick={onEditGrid}><ArrowLeft /> Edit grid</button>
         <button className="btn btn-primary" onClick={onRaceAgain}><RotateCcw /> Race again</button>
       </div>

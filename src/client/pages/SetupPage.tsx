@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronRight, Flag, LoaderCircle, Minus, Plus } from "lucide-react";
+import { AlertCircle, ChevronRight, LoaderCircle, Minus, Plus } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { Competitor, ProviderInfo } from "../../shared/types";
 import { RacerPicker, type RacerChoice } from "../RacerPicker";
@@ -33,15 +33,12 @@ export function SetupPage({
   return (
     <section className="page-main is-reading page-enter">
       <div className="panel is-shell">
-        <header className="setup-intro panel-body cn-row cn-top cn-between cn-gap-28">
-          <div>
-            <div className="eyebrow"><Flag size={14} /> STARTING LINEUP</div>
-            <h1 className="cn-display-sm cn-m-0">Choose your racers.</h1>
-          </div>
-          <span className="setup-count cn-fixed" aria-label={`${competitors.length} of 6 models selected`}>{competitors.length} <small>/ 6</small></span>
+        <header className="setup-intro panel-body cn-row cn-between cn-gap-32">
+          <h1 className="cn-display is-sm">Choose your racers.</h1>
+          <span className="cn-fixed cn-ui cn-tabular cn-text-text" aria-label={`${competitors.length} of 6 models selected`}>{competitors.length} <span className="cn-text-overlay-2">/ 6</span></span>
         </header>
 
-        <div className="setup-content cn-px-22">
+        <div className="setup-content cn-px-24">
           {providersLoading ? (
             <div className="empty-state"><LoaderCircle className="spin" /><strong>Scanning local agents…</strong><span>Checking installed harnesses and models</span></div>
           ) : providersError ? (
@@ -53,7 +50,7 @@ export function SetupPage({
                   <div className="competitor-card cn-spine" key={competitor.id} style={{ "--accent": competitor.color } as CSSProperties}>
                     <RacerPicker providers={providers} harness={competitor.harness} model={competitor.model} onChange={(choice) => onSelectionChange(competitor.id, choice)} />
                     <button
-                      className={`btn-icon cn-tone-red remove-button${competitors.length <= 2 ? " is-hidden" : ""}`}
+                      className={`btn is-icon cn-tone-red remove-button${competitors.length <= 2 ? " is-hidden" : ""}`}
                       onClick={() => onRemoveCompetitor(competitor.id)}
                       disabled={competitors.length <= 2}
                       aria-hidden={competitors.length <= 2 ? true : undefined}
@@ -63,7 +60,7 @@ export function SetupPage({
                   </div>
                 ))}
               </div>
-              {competitors.length < 6 && <button key="add-model" className="btn-dashed cn-w-full cn-mt-8" onClick={onAddCompetitor}><Plus size={17} /> Add model</button>}
+              {competitors.length < 6 && <button key="add-model" className="btn btn-ghost is-dashed is-lg cn-w-full cn-mt-8" onClick={onAddCompetitor}><Plus size={17} /> Add model</button>}
             </div>
           )}
 
@@ -72,8 +69,8 @@ export function SetupPage({
           )}
         </div>
 
-        <div className="setup-actions panel-body">
-          <button className="btn btn-primary cn-w-full" disabled={!canReview || !engineReady} onClick={onContinue}>Set up race <ChevronRight size={18} /></button>
+        <div className="setup-actions panel-body cn-row cn-end">
+          <button className="btn btn-primary" disabled={!canReview || !engineReady} onClick={onContinue}>Set up race <ChevronRight size={18} /></button>
         </div>
       </div>
     </section>

@@ -1,13 +1,12 @@
-/* Harness Racer client — app-specific layer over the catppuccin-neu design
-   system. The package CSS is imported in main.tsx (catppuccin-neu/css/index.css)
-   and bundled by Vite, so the shipped dist/client CSS stays dependency-free.
-   Tokens, utilities, and recipes (app-shell, page-main, panel, panel-body,
-   well, topbar, wordmark, btn-*, segmented, stepper, banner, chip-tone,
-   table-neu, terminal, progress-track, accordion, footer-neu, footer-brand,
-   mark-solid, input, empty-state, eyebrow, the cn-* layout and type
-   utilities) come from the package; only genuinely app-specific styling
-   (lanes, podium, picker geometry, harness marks, race geometry, starting
-   lights) lives here. Per-lane color rides the --accent contract prop. */
+/* Harness Racer client. App-specific styling over the catppuccin-neu design
+   system, which main.tsx imports (catppuccin-neu/css/index.css) and Vite
+   bundles, so the shipped dist/client CSS has no runtime dependency.
+   The shell, page column, panels, wells, topbar, wordmark, buttons,
+   segmented, stepper, banner, tag, data-table, kv, stat, terminal, progress
+   track, accordion, page footer, mark, inputs, empty state and the cn-*
+   utilities come from the package. This file holds the lanes, podium, picker
+   geometry, harness marks and starting lights. Per-lane color rides the
+   --accent contract prop. */
 
 /* ── Topbar ─────────────────────────────────────────────────────────────── */
 
@@ -15,8 +14,8 @@
    button chrome; the tile keeps the brand's asymmetric corner. */
 .wordmark { padding: 0; border: 0; background: transparent; cursor: pointer; }
 .wordmark:disabled { cursor: default; }
-.wordmark > .mark-solid { border-radius: 10px 10px 10px 4px; }
-.phase-track i { font-style: normal; font-variant-numeric: tabular-nums; }
+.wordmark > .mark { border-radius: 10px 10px 10px 4px; }
+.stepper i { font-style: normal; font-variant-numeric: tabular-nums; }
 
 /* ── Shared ─────────────────────────────────────────────────────────────── */
 
@@ -33,8 +32,6 @@
 
 /* ── Setup ──────────────────────────────────────────────────────────────── */
 
-.setup-count { color: var(--text); font: 750 13px/1 var(--sans); font-variant-numeric: tabular-nums; }
-.setup-count small { color: var(--overlay-1); font: inherit; }
 .competitor-card { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 34px; gap: 8px; align-items: center; min-height: 68px; padding: 5px 6px 5px 10px; transition: grid-template-columns var(--t-base) var(--ease-out), gap var(--t-base) var(--ease-out); }
 .competitor-card:has(.remove-button.is-hidden) { grid-template-columns: minmax(0, 1fr) 0; gap: 0; }
 .remove-button { grid-column: 2; grid-row: 1; align-self: center; justify-self: end; overflow: hidden; opacity: 1; visibility: visible; transform: translateX(0) scale(1); transition: width var(--t-base) var(--ease-out), opacity var(--t-fast) var(--ease-out), transform var(--t-base) var(--ease-out), visibility 0s; }
@@ -46,9 +43,10 @@
 /* ── Racer picker ───────────────────────────────────────────────────────── */
 
 .racer-picker { min-width: 0; position: relative; }
-.racer-picker-trigger { width: 100%; min-height: 56px; padding: 8px 12px; display: flex; align-items: center; gap: 11px; color: var(--text); border: 0; border-radius: 10px; background: transparent; text-align: left; cursor: pointer; transition: background var(--t-fast), box-shadow var(--t-fast) var(--ease-spring), transform var(--t-fast) var(--ease-spring); }
-.racer-picker-trigger:hover, .racer-picker.open .racer-picker-trigger { background: var(--base); box-shadow: var(--neu-raised-soft), inset 1px 1px color-mix(in srgb, var(--surface-2) 28%, transparent); transform: translateY(-1px); }
-.racer-picker-trigger:active { transform: translateY(1px); box-shadow: var(--neu-inset-soft); }
+/* The trigger sits in a carved well, so hover is a flat fill rather than a
+   raised card lifting out of the trough. */
+.racer-picker-trigger { width: 100%; min-height: 56px; padding: 8px 12px; display: flex; align-items: center; gap: 12px; color: var(--text); border: 0; border-radius: var(--cn-radius-card); background: transparent; text-align: left; cursor: pointer; transition: background var(--t-fast) var(--ease-out); }
+.racer-picker-trigger:hover, .racer-picker.open .racer-picker-trigger { background: color-mix(in srgb, var(--surface-0) 60%, transparent); }
 .racer-picker-cue { color: var(--overlay-1); transition: color var(--t-fast); }
 .racer-picker.open .racer-picker-cue { color: var(--mauve); }
 .racer-picker-logo { width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 8px; background: transparent; box-shadow: var(--neu-inset-soft); }
@@ -65,13 +63,13 @@
 .racer-picker-sidebar > :not([aria-pressed="true"]) { color: var(--overlay-1); border-color: transparent; background: transparent; box-shadow: none; }
 .racer-picker-sidebar > :not([aria-pressed="true"]):hover { transform: none; color: var(--text); background: color-mix(in srgb, var(--surface-0) 60%, transparent); }
 .racer-picker-sidebar > :not([aria-pressed="true"]):active { transform: translateY(1px); box-shadow: var(--neu-inset-soft); }
-.racer-picker-search { grid-column: 2; grid-row: 1; padding: 11px 12px; border-bottom: 1px solid var(--surface-0); }
+/* 9px above and below a 46px input fills the 64px row exactly. */
+.racer-picker-search { grid-column: 2; grid-row: 1; padding: 9px 12px; border-bottom: 1px solid var(--surface-0); }
 .racer-picker-options { grid-column: 2; grid-row: 2; min-height: 0; overflow-y: auto; padding: 7px; scrollbar-color: var(--surface-2) transparent; }
 .racer-picker-pane-label { height: 32px; padding: 0 9px; }
 .racer-picker-option { width: 100%; min-height: 54px; padding: 7px 9px; display: flex; align-items: center; gap: 9px; color: var(--text); border: 0; border-radius: 10px; background: transparent; text-align: left; cursor: pointer; }
 .racer-picker-option.highlighted { background: var(--surface-0); }
 .racer-picker-option strong { font-size: 13px; }
-.racer-picker-option em { padding: 4px 5px; border: 1px solid color-mix(in srgb, var(--yellow) 32%, var(--surface-0)); border-radius: 4px; }
 .racer-picker-option > svg { color: transparent; }
 .racer-picker-option > svg.selected { color: var(--green); }
 .racer-picker-empty { min-height: 110px; display: grid; place-items: center; color: var(--overlay-1); font-size: 12px; }
@@ -80,22 +78,15 @@
 
 .section-intro { align-items: flex-end; }
 .starting-lights { flex: 0 0 auto; padding: 10px; display: flex; gap: 8px; border-radius: 999px; background: var(--base); box-shadow: var(--neu-inset); }
-.starting-lights span { width: 22px; height: 22px; border-radius: 50%; background: var(--red); box-shadow: var(--neu-inset-soft), inset 0 1px rgb(255 255 255 / .16); }
+.starting-lights span { width: 22px; height: 22px; border-radius: 50%; background: var(--red); box-shadow: var(--neu-inset-soft); }
 .starting-lights span:nth-child(2) { background: var(--yellow); }
 .starting-lights span:nth-child(3) { background: var(--green); }
 .review-racer { min-height: 76px; padding: 9px 10px 9px 14px; display: grid; grid-template-columns: 32px 32px minmax(0, 1fr) minmax(220px, .8fr); align-items: center; gap: 12px; }
 .review-racer-model strong { font-size: 14px; }
-.review-name .input { height: 44px; }
-/* The one hero action: a large secondary button carrying the green launch
-   mark and a two-line label. */
-.launch-button { width: min(270px, 100%); justify-self: end; margin: 2px 2px 4px; min-height: 78px; padding: 0 16px; justify-content: flex-start; gap: 13px; text-align: left; }
-.launch-button > span { width: 42px; height: 42px; display: grid; place-items: center; flex: 0 0 auto; color: var(--crust); border-radius: 50%; background: var(--green); box-shadow: var(--shadow-mark); }
-.launch-button small { color: var(--subtext-0); font-size: 12px; }
 
 /* ── Race options (segmented + presets) ─────────────────────────────────── */
 
-.race-options { display: grid; grid-template-columns: .9fr 1.1fr; gap: 22px; align-items: end; }
-.option-label { color: var(--text); font-size: 13px; font-weight: 720; }
+.race-options { display: grid; grid-template-columns: .9fr 1.1fr; gap: 24px; align-items: end; }
 .segmented [aria-pressed="true"] svg { color: var(--mauve); }
 .radio-mark { width: 14px; height: 14px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; box-shadow: var(--neu-inset-soft); }
 .radio-mark span { width: 7px; height: 7px; border-radius: 50%; background: var(--mauve); }
@@ -104,32 +95,22 @@
 
 .race-view { scroll-margin-top: 68px; }
 .race-header { align-items: flex-end; }
-.heat-switcher { color: var(--overlay-0); font: 650 12px var(--sans); font-variant-numeric: tabular-nums; }
-.heat-switcher > span { transition: color var(--t-base); }
-.heat-switcher > span span { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 8px; }
-.heat-switcher > span.active { color: var(--mauve); }
-.heat-switcher > span.is-done { color: var(--green); }
-.heat-switcher i { width: 24px; height: 1px; background: var(--surface-1); }
-/* A lane is one raised plane holding one carved stream well — two elevations,
-   no internal hairlines, separation by gap. "Running" is said once per
-   channel that can carry it: the mark lights, the headline metric takes the
-   accent, the status word turns. No stripe, no border tint, no card lift. */
+/* A lane is one panel holding one carved stream well: two elevations,
+   separated by gap. "Running" shows on each channel that can carry it: the
+   mark lights, the headline stat takes the accent, the status word turns.
+   No stripe, no border tint, no card lift. */
 .race-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr)); gap: 14px; }
-.race-lane { min-width: 0; padding: 17px; display: grid; align-content: start; gap: 15px; border-radius: var(--pane-radius); background: var(--base); box-shadow: var(--neu-raised); }
+.race-lane { padding: 16px; display: grid; align-content: start; gap: 16px; }
 .lane-head .harness-mark { width: 38px; height: 38px; padding: 7px; color: var(--overlay-1); border: 0; border-radius: 11px 11px 11px 4px; background: transparent; box-shadow: var(--neu-inset-soft); transition: color var(--t-base), background var(--t-base), box-shadow var(--t-base); }
 .status-running .lane-head .harness-mark { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--base)); box-shadow: var(--neu-inset-soft), 0 0 0 1px color-mix(in srgb, var(--accent) 42%, transparent); }
-.lane-identity strong { font-size: 15px; font-weight: 750; letter-spacing: -.015em; }
-/* Value over label: the DOM keeps label-first for reading order, so the flip
-   is visual only. The headline metric is the one number that ever colors. */
+/* The headline stat is the one number that ever colors, and only once a live
+   reading has arrived. */
 .lane-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
-.lane-metrics .metric { padding: 0; }
-.lane-metrics .metric strong { font: 800 27px/1 var(--sans); letter-spacing: -.045em; }
-.lane-metrics .metric.is-hero strong { color: var(--overlay-0); }
-.lane-metrics .metric.is-hero.metric-accent strong { color: var(--accent); }
+.lane-metrics .stat { padding: 0; }
+.lane-metrics .stat.is-lg:not(.is-live) strong { color: var(--overlay-0); }
 /* Fixed stream height: lanes stay locked to each other for the whole race
    rather than growing as output arrives. 190px is the old 270px trimmed to
    what a stream actually fills; it scrolls past that. */
-.stream-window { border-radius: 11px; }
 .stream-window pre { flex: none; height: 190px; padding: 7px 12px 12px; }
 .stream-toolbar { flex: 0 0 auto; padding: 9px 12px 0; }
 .caret.hidden { opacity: 0; animation: none; }
@@ -147,13 +128,13 @@
 .podium-entry.rank-1 .harness-mark { width: 46px; height: 46px; }
 .podium-identity strong { color: var(--text); font-size: clamp(13px, 2vw, 17px); }
 .podium-entry.rank-1 .podium-identity strong { font-size: clamp(15px, 2.3vw, 20px); }
-.podium-identity b { max-width: 100%; margin-top: 4px; overflow: hidden; color: var(--accent); font: 800 clamp(22px, 4vw, 34px)/1 var(--sans); font-variant-numeric: tabular-nums; letter-spacing: -.045em; text-overflow: ellipsis; white-space: nowrap; }
+.podium-identity b { max-width: 100%; margin-top: 4px; overflow: hidden; color: var(--accent); font: 700 clamp(22px, 4vw, 34px)/1 var(--sans); font-variant-numeric: tabular-nums; letter-spacing: -.045em; text-overflow: ellipsis; white-space: nowrap; }
 .podium-entry.rank-1 .podium-identity b { font-size: clamp(28px, 5vw, 42px); }
 .podium-step { height: var(--step-height); display: grid; place-items: center; color: color-mix(in srgb, var(--accent) 36%, var(--overlay-0)); border-top: 2px solid color-mix(in srgb, var(--accent) 64%, var(--surface-1)); background: color-mix(in srgb, var(--surface-0) 16%, var(--base)); box-shadow: var(--neu-inset-soft); }
 .podium-entry.rank-2 .podium-step { border-radius: 13px 0 0; }
 .podium-entry.rank-1 .podium-step { border-radius: 13px 13px 0 0; }
 .podium-entry.rank-3 .podium-step { border-radius: 0 13px 0 0; }
-.podium-step span { font: 850 clamp(26px, 5vw, 46px)/1 var(--sans); font-variant-numeric: tabular-nums; }
+.podium-step span { font: 700 clamp(26px, 5vw, 46px)/1 var(--sans); font-variant-numeric: tabular-nums; }
 .table-title h2 { color: var(--text); }
 .results-table table { min-width: 790px; }
 .position-badge { width: 30px; height: 30px; display: grid; place-items: center; color: var(--subtext-0); border: 1px solid var(--surface-1); border-radius: 8px; font-variant-numeric: tabular-nums; }
@@ -165,8 +146,7 @@ tr.disqualified .table-racer strong, tr.disqualified td { color: var(--subtext-0
 .table-racer { min-width: 210px; }
 .table-lane-swatch { width: 4px; height: 34px; flex: 0 0 auto; border-radius: 999px; }
 .table-racer small { max-width: 180px; }
-td.crowned { color: var(--yellow); }
-.best-chip { margin-left: 6px; padding: 3px 5px; color: var(--crust); border-radius: 4px; background: var(--yellow); font: 700 10px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; vertical-align: 2px; }
+.best-tag { margin-left: 8px; }
 /* The package accordion carries the whole disclosure; only the peach warning
    icon and the row list are app-side. */
 .invalid-results p { margin: 0; padding: 11px 0; display: grid; gap: 4px; }
@@ -176,18 +156,6 @@ td.crowned { color: var(--yellow); }
 /* ── About ──────────────────────────────────────────────────────────────── */
 
 .method-section { margin-top: 58px; }
-.metric-definitions article { min-height: 72px; padding: 14px 18px; display: grid; align-items: center; }
-.metric-definitions h3 { margin: 0 0 5px; font-size: 14px; }
-.metric-definitions p { margin: 0; color: var(--subtext-0); font-size: 12px; line-height: 1.55; }
-.boundary-note { margin: 12px 0 0; padding: 12px 14px; display: flex; align-items: flex-start; gap: 8px; color: var(--subtext-0); border-left: 3px solid var(--yellow); background: color-mix(in srgb, var(--yellow) 5%, transparent); font: 500 12px/1.55 var(--sans); }
-.boundary-note svg { margin-top: 1px; flex: 0 0 auto; color: var(--yellow); }
-.sample-table > div { min-height: 58px; padding: 12px 15px; display: grid; grid-template-columns: 100px 1fr; align-items: center; gap: 14px; }
-.sample-table strong { color: var(--subtext-1); font-size: 12px; line-height: 1.5; }
-.limits-card > p { margin-bottom: 14px; color: var(--text); font-size: 13px; line-height: 1.55; }
-.limits-card ul { margin: 0; padding-left: 18px; color: var(--subtext-0); font-size: 12px; line-height: 1.65; }
-.limits-card li + li { margin-top: 5px; }
-.source-copy > p { margin: 0; color: var(--subtext-0); font-size: 12px; }
-.source-copy > p + ul, .source-copy > ul + p { margin-top: 12px; }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 
@@ -211,7 +179,6 @@ td.crowned { color: var(--yellow); }
   .starting-lights { margin-top: 5px; }
   .review-racer { grid-template-columns: 30px 30px minmax(0, 1fr); gap: 10px; padding: 10px; }
   .review-name { grid-column: 3; }
-  .launch-button { grid-column: 1; width: 100%; }
   .race-header { align-items: flex-start; flex-direction: column; }
   .race-header-right { width: 100%; justify-content: space-between; }
   .podium-showcase, .podium-grid { min-height: 280px; }
@@ -221,24 +188,15 @@ td.crowned { color: var(--yellow); }
   .podium-entry.rank-3 { --step-height: 44px; }
   .podium-identity { padding-bottom: 12px; }
   .results-table table { min-width: 0; }
-  .results-table td:nth-child(1) { grid-column: 1; grid-row: 1; }
-  .results-table td:nth-child(2) { grid-column: 1 / 4; grid-row: 1; padding-left: 42px; }
   .table-racer { min-width: 0; }
   .table-racer small { max-width: 100%; }
-  .best-chip { display: none; }
 }
 
 @media (max-width: 520px) {
   .section-intro { flex-direction: column; }
   .starting-lights { align-self: flex-end; margin-top: 0; }
   .race-header-right { align-items: flex-end; }
-  .heat-switcher { align-items: flex-start; flex-direction: column; }
-  .heat-switcher i { display: none; }
-  .lane-metrics .metric strong { font-size: 21px; }
   .stream-window pre { height: 150px; }
-  .results-actions { align-items: stretch; flex-direction: column; }
-  .metric-definitions article { grid-template-columns: 1fr; gap: 7px; }
-  .sample-table > div { grid-template-columns: 1fr; gap: 5px; }
   .setup-intro { gap: 12px; }
   .competitor-card { width: 100%; justify-self: stretch; }
   .racer-picker-trigger { min-height: 56px; padding-inline: 9px; }
@@ -259,9 +217,7 @@ td.crowned { color: var(--yellow); }
   .podium-entry.rank-1 .harness-mark { width: 36px; height: 36px; }
   .podium-identity strong { font-size: 12px; }
   .podium-entry.rank-1 .podium-identity strong { font-size: 13px; }
-  .podium-identity small { display: none; }
   .podium-identity b { font-size: 18px; }
   .podium-entry.rank-1 .podium-identity b { font-size: 24px; }
   .podium-step span { font-size: 25px; }
-  .footer-brand > span { display: none; }
 }
