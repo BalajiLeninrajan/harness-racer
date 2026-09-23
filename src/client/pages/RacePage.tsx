@@ -70,7 +70,7 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
               <div className="lane-head cn-row cn-gap-12">
                 <ModelMark harness={competitor.harness} model={competitor.model} />
                 <div className="lane-identity cn-grow cn-stack cn-gap-4"><strong className="cn-name">{competitor.label}</strong><span className="cn-code-meta cn-truncate">{competitor.model}</span></div>
-                <div className="cn-row cn-microlabel cn-nowrap">
+                <div className="cn-row cn-label cn-nowrap">
                   <span className="cn-text-overlay-0">P{index + 1}</span>
                   <span className={`cn-row cn-gap-4 ${lane.status === "running" ? "cn-text-accent" : lane.status === "complete" ? "cn-text-green" : lane.status === "error" ? "cn-text-red" : ""}`}>
                     {lane.status === "running" ? <><span className="live-dot" /> Streaming</> : lane.status === "starting" || lane.status === "ready" || lane.status === "queued" ? <><LoaderCircle className="spin" size={13} /> {STATUS_LABELS[lane.status]}</> : lane.status === "error" ? <><AlertCircle size={13} /> Error</> : <><Check size={13} /> Heat done</>}

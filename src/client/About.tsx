@@ -40,7 +40,7 @@ export function About({ onBack }: AboutProps) {
               Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, and Illia Polosukhin.
             </li>
             <li>
-              Code: <a href="https://github.com/karpathy/nanoGPT/blob/master/model.py" target="_blank" rel="noreferrer"><code className="cn-code-inline">CausalSelfAttention.forward</code> from nanoGPT</a>,
+              Code: <code className="cn-code-inline">CausalSelfAttention.forward</code> from <a href="https://github.com/karpathy/nanoGPT/blob/master/model.py" target="_blank" rel="noreferrer">nanoGPT</a>,
               copyright Andrej Karpathy and used under the MIT License.
             </li>
           </ul>
