@@ -4,7 +4,7 @@
    The shell, page column, panels, wells, topbar, wordmark, buttons,
    segmented, stepper, banner, tag, data-table, kv, stat, terminal, progress
    track, accordion, page footer, mark, inputs, empty state and the cn-*
-   utilities come from the package. This file holds the lanes, podium, picker
+   utilities come from the package. This file holds the lanes, the photo finish chart, picker
    geometry, harness marks and starting lights. Per-lane color rides the
    --accent contract prop. */
 
@@ -115,43 +115,48 @@
 .stream-toolbar { flex: 0 0 auto; padding: 9px 12px 0; }
 .caret.hidden { opacity: 0; animation: none; }
 
-/* ── Results ────────────────────────────────────────────────────────────── */
+/* ── Results: photo finish ──────────────────────────────────────────────── */
 
-.podium-showcase { min-height: 310px; }
-.podium-grid { min-height: 310px; padding: 24px 28px 0; display: grid; grid-template-columns: 1fr 1.08fr 1fr; grid-template-areas: "second first third"; align-items: stretch; }
-.podium-entry { min-width: 0; display: grid; grid-template-rows: 1fr var(--step-height); align-items: end; }
-.podium-entry.rank-1 { grid-area: first; --step-height: 94px; }
-.podium-entry.rank-2 { grid-area: second; --step-height: 68px; }
-.podium-entry.rank-3 { grid-area: third; --step-height: 50px; }
-.podium-identity { min-width: 0; padding: 0 clamp(8px, 2vw, 18px) 16px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
-.podium-identity .harness-mark { width: 40px; height: 40px; margin: 2px 0 3px; border-radius: 10px; }
-.podium-entry.rank-1 .harness-mark { width: 46px; height: 46px; }
-.podium-identity strong { color: var(--text); font-size: clamp(13px, 2vw, 17px); }
-.podium-entry.rank-1 .podium-identity strong { font-size: clamp(15px, 2.3vw, 20px); }
-.podium-identity b { max-width: 100%; margin-top: 4px; overflow: hidden; color: var(--accent); font: 700 clamp(22px, 4vw, 34px)/1 var(--sans); font-variant-numeric: tabular-nums; letter-spacing: -.045em; text-overflow: ellipsis; white-space: nowrap; }
-.podium-entry.rank-1 .podium-identity b { font-size: clamp(28px, 5vw, 42px); }
-.podium-step { height: var(--step-height); display: grid; place-items: center; color: color-mix(in srgb, var(--accent) 36%, var(--overlay-0)); border-top: 2px solid color-mix(in srgb, var(--accent) 64%, var(--surface-1)); background: color-mix(in srgb, var(--surface-0) 16%, var(--base)); box-shadow: var(--neu-inset-soft); }
-.podium-entry.rank-2 .podium-step { border-radius: 13px 0 0; }
-.podium-entry.rank-1 .podium-step { border-radius: 13px 13px 0 0; }
-.podium-entry.rank-3 .podium-step { border-radius: 0 13px 0 0; }
-.podium-step span { font: 700 clamp(26px, 5vw, 46px)/1 var(--sans); font-variant-numeric: tabular-nums; }
-.table-title h2 { color: var(--text); }
-.results-table table { min-width: 790px; }
-.position-badge { width: 30px; height: 30px; display: grid; place-items: center; color: var(--subtext-0); border: 1px solid var(--surface-1); border-radius: 8px; font-variant-numeric: tabular-nums; }
-.position-1 { color: var(--crust); border-color: color-mix(in srgb, currentColor 14%, transparent); background: var(--yellow); box-shadow: var(--shadow-mark); }
-.position-dsq { width: auto; min-width: 30px; padding: 0 6px; color: var(--crust); border-color: var(--red); background: var(--red); font: 700 10px var(--sans); letter-spacing: .08em; text-transform: uppercase; }
-tr.has-anomalies { background: color-mix(in srgb, var(--peach) 4%, transparent); }
-tr.disqualified { background: color-mix(in srgb, var(--red) 4%, transparent); }
-tr.disqualified .table-racer strong, tr.disqualified td { color: var(--subtext-0); }
-.table-racer { min-width: 210px; }
-.table-lane-swatch { width: 4px; height: 34px; flex: 0 0 auto; border-radius: 999px; }
-.table-racer small { max-width: 180px; }
-.best-tag { margin-left: 8px; }
-/* The package accordion carries the whole disclosure; only the peach warning
-   icon and the row list are app-side. */
-.invalid-results p { margin: 0; padding: 11px 0; display: grid; gap: 4px; }
-.invalid-results strong { color: var(--text); font-size: 12px; }
-.invalid-results p span { color: var(--overlay-2); font: 500 12px/1.5 var(--sans); }
+/* One lane per ranked stack on a shared time axis. --t is the stack's
+   median in seconds, --finish the winner's, --scale the axis end. The lead
+   and tail are the columns before and after the track, so the finish line
+   and the axis can find the track from the chart's own edges. */
+.hr-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; gap: var(--space-6); }
+.hr-chart { --hr-pad: var(--space-6); --hr-gap: var(--space-4); --hr-lead: calc(16px + 28px + 180px + 3 * var(--hr-gap)); --hr-tail: calc(64px + var(--hr-gap)); --hr-run: 1.3s; position: relative; }
+.hr-lane { display: grid; grid-template-columns: 16px 28px 180px minmax(0, 1fr) 64px; align-items: center; gap: var(--hr-gap); padding: var(--space-4) var(--hr-pad); }
+.hr-lane > .cn-value { text-align: right; }
+.hr-lane .mark .brand-logo, .hr-lane .mark img { filter: none; opacity: .82; }
+.hr-track { position: relative; align-self: stretch; min-height: 44px; }
+.hr-track .progress-track { position: absolute; inset: auto 0 8px; }
+.hr-track .progress-track span { width: calc(var(--t) / var(--scale) * 100%); transform-origin: left; }
+
+/* The finish line: one chequered column at the winner's time, drawn once
+   over the whole lane list so it never breaks between lanes. */
+.hr-finish { position: absolute; z-index: 1; inset-block: 0; left: calc(var(--hr-pad) + var(--hr-lead) + (100% - 2 * var(--hr-pad) - var(--hr-lead) - var(--hr-tail)) * var(--finish) / var(--scale) - 3px); width: 6px; background: repeating-conic-gradient(var(--overlay-2) 0 25%, transparent 0 50%) 0 0 / 6px 6px; opacity: .5; pointer-events: none; }
+
+/* The margin: a bracket from the finish line to the runner-up's time,
+   the same number as the headline. */
+.hr-gap { position: absolute; z-index: 1; bottom: 22px; left: calc(var(--finish) / var(--scale) * 100% + 3px); width: calc((var(--t) - var(--finish)) / var(--scale) * 100% - 3px); height: 6px; border: 1px solid var(--overlay-2); border-bottom: 0; border-radius: var(--cn-radius-chip) var(--cn-radius-chip) 0 0; }
+.hr-gap b { position: absolute; bottom: calc(100% + var(--space-1)); left: 50%; translate: -50% 0; color: var(--text); font: var(--cn-type-label-weight) var(--cn-type-label-size)/1 var(--sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.hr-axis { height: 16px; margin: 0 calc(var(--hr-pad) + var(--hr-tail)) var(--space-4) calc(var(--hr-pad) + var(--hr-lead)); }
+.hr-axis span { position: absolute; left: calc(var(--at) / var(--scale) * 100%); translate: -50% 0; }
+.hr-axis span:first-child { translate: 0 0; }
+.hr-axis span:last-child { translate: -100% 0; }
+
+/* The race replays once. Every bar leaves together and runs for a time
+   proportional to its median, so the winner lands first; the curve is the
+   landing page's race curve. The finish line shows as the winner lands, the
+   bracket as the runner-up does. Nothing loops. */
+@keyframes hr-run { from { transform: scaleX(0); } }
+@keyframes hr-show { from { opacity: 0; } }
+.hr-track .progress-track span { animation: hr-run calc(var(--t) / var(--scale) * var(--hr-run)) cubic-bezier(.32, .06, .31, 1) .3s backwards; }
+.hr-finish { animation: hr-show var(--t-slow) var(--ease-out) calc(.3s + var(--finish) / var(--scale) * var(--hr-run)) backwards; }
+.hr-gap { animation: hr-show var(--t-slow) var(--ease-out) calc(.3s + var(--t) / var(--scale) * var(--hr-run)) backwards; }
+/* Reduced motion: the finished chart, full bars, line and bracket shown. */
+@media (prefers-reduced-motion: reduce) {
+  .hr-track .progress-track span, .hr-finish, .hr-gap { animation: none; }
+}
 
 /* ── About ──────────────────────────────────────────────────────────────── */
 
@@ -161,6 +166,7 @@ tr.disqualified .table-racer strong, tr.disqualified td { color: var(--subtext-0
 
 @media (max-width: 1060px) {
   .phase-track { display: none; }
+  .hr-body { grid-template-columns: minmax(0, 1fr); }
   .page-context { display: none; }
 }
 
@@ -181,15 +187,14 @@ tr.disqualified .table-racer strong, tr.disqualified td { color: var(--subtext-0
   .review-name { grid-column: 3; }
   .race-header { align-items: flex-start; flex-direction: column; }
   .race-header-right { width: 100%; justify-content: space-between; }
-  .podium-showcase, .podium-grid { min-height: 280px; }
-  .podium-grid { padding: 18px 14px 0; }
-  .podium-entry.rank-1 { --step-height: 82px; }
-  .podium-entry.rank-2 { --step-height: 60px; }
-  .podium-entry.rank-3 { --step-height: 44px; }
-  .podium-identity { padding-bottom: 12px; }
-  .results-table table { min-width: 0; }
-  .table-racer { min-width: 0; }
-  .table-racer small { max-width: 100%; }
+  /* Phones: the name row sits over its track, and the finish line runs
+     through both, behind opaque labels. */
+  .hr-chart { --hr-pad: var(--space-4); --hr-lead: 0px; --hr-tail: 0px; }
+  .hr-lane { grid-template-columns: 16px 28px minmax(0, 1fr) auto; gap: var(--space-2) var(--space-3); padding-block: var(--space-3); }
+  .hr-track { grid-column: 1 / -1; }
+  .hr-label { position: relative; z-index: 2; justify-self: start; padding-right: var(--space-2); background: var(--base); }
+  .hr-lane > .cn-value { grid-area: 1 / 4; padding-left: var(--space-2); }
+  .hr-label > .cn-meta { white-space: normal; }
 }
 
 @media (max-width: 520px) {
@@ -207,17 +212,4 @@ tr.disqualified .table-racer strong, tr.disqualified td { color: var(--subtext-0
   .racer-picker-sidebar > * { width: 42px; min-height: 42px; }
   .racer-picker-search { grid-column: 1; grid-row: 2; }
   .racer-picker-options { grid-column: 1; grid-row: 3; overscroll-behavior: contain; }
-  .podium-showcase, .podium-grid { min-height: 238px; }
-  .podium-grid { padding: 12px 8px 0; }
-  .podium-entry.rank-1 { --step-height: 70px; }
-  .podium-entry.rank-2 { --step-height: 52px; }
-  .podium-entry.rank-3 { --step-height: 38px; }
-  .podium-identity { padding: 0 4px 10px; gap: 4px; }
-  .podium-identity .harness-mark { width: 31px; height: 31px; border-radius: 8px; }
-  .podium-entry.rank-1 .harness-mark { width: 36px; height: 36px; }
-  .podium-identity strong { font-size: 12px; }
-  .podium-entry.rank-1 .podium-identity strong { font-size: 13px; }
-  .podium-identity b { font-size: 18px; }
-  .podium-entry.rank-1 .podium-identity b { font-size: 24px; }
-  .podium-step span { font-size: 25px; }
 }
