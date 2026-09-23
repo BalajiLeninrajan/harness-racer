@@ -17,7 +17,7 @@
 main { display: grid; align-content: center; overflow: hidden; }
 
 /* The brand tile keeps its asymmetric corner. */
-.wordmark > .mark-solid { border-radius: 10px 10px 10px 4px; }
+.wordmark > .mark { border-radius: 10px 10px 10px 4px; }
 
 /* ── The field ────────────────────────────────────────────────────────────
    Four accent streaks racing the width of the page on a loop. Each one grows
