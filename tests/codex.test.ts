@@ -178,6 +178,32 @@ describe("Codex adapter protocol", () => {
     expect(server.child.kill).toHaveBeenCalledWith("SIGTERM");
   });
 
+  it("reports the app-server's own error when it dies with output still buffered", async () => {
+    const server = fakeAppServer((request, rpc) => {
+      if (request.method === "initialize") return {};
+      if (request.method === "thread/start") return { thread: { id: "thread-1" } };
+      if (request.method === "turn/start") {
+        queueMicrotask(() => {
+          // The process is gone before its last line reaches readline; the
+          // stdio streams close afterwards.
+          rpc.child.exitCode = 1;
+          rpc.child.emit("exit", 1, null);
+          rpc.send({ method: "error", params: { threadId: "thread-1", willRetry: false, error: { message: "model unavailable" } } });
+          setImmediate(() => rpc.child.emit("close", 1, null));
+        });
+        return { turn: { id: "turn-1" } };
+      }
+      throw new Error(`Unexpected ${request.method}`);
+    });
+    useAppServer(server);
+    const { codexAdapter } = await import("../src/server/adapters/codex.js");
+
+    await expect(codexAdapter.run({
+      model: "gpt-5", prompt: "test", cwd: "/tmp/project", signal: new AbortController().signal,
+      onReady: vi.fn(), waitForStart: vi.fn().mockResolvedValue(undefined), onDelta: vi.fn(),
+    })).rejects.toThrow("model unavailable");
+  });
+
   it("interrupts an active turn when cancelled and closes the app-server", async () => {
     const controller = new AbortController();
     const server = fakeAppServer((request) => {
