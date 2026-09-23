@@ -145,6 +145,8 @@ describe("Cursor adapter", () => {
       model: "default", prompt: "test", cwd: "/tmp/project", signal: new AbortController().signal,
       onReady, waitForStart: vi.fn(), onDelta: vi.fn(),
     })).rejects.toThrow("Cursor Auto is dynamic");
-    expect(onReady).toHaveBeenCalledOnce();
+    // A lane that fails in setup was never ready; the engine releases the
+    // start barrier on the rejection itself.
+    expect(onReady).not.toHaveBeenCalled();
   });
 });

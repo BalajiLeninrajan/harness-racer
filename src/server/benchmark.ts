@@ -10,6 +10,7 @@ import type {
   ServerEvent,
   WorkloadId,
 } from "../shared/types.js";
+import { settledWithin, untilAborted } from "./adapters/lib/run.js";
 import type { AdapterRunOutput, HarnessAdapter } from "./adapters/types.js";
 import { countNormalizedTokens, streamAnomalyMessage, summarizeResults } from "./metrics.js";
 import { validateOutput, workloads } from "./workloads.js";
@@ -24,32 +25,10 @@ type Emit = (event: ServerEvent) => void;
 
 const RUN_TIMEOUT_MS = 120_000;
 // Long enough for every adapter to have sent SIGKILL to a child that ignored
-// SIGTERM (Codex: up to 800 ms interrupt, then 1 s; the rest: 1.5 s).
+// SIGTERM (Codex: up to 800 ms interrupt, then 1 s; Claude, which spawns the
+// CLI itself rather than leaving the kill to the SDK's 2 s + 5 s close, and
+// the ACP lanes: 1.5 s).
 const TEARDOWN_GRACE_MS = 2_000;
-
-// Settles with the promise, or rejects with the signal's reason as soon as it
-// aborts, so nothing in runOne keeps waiting on an adapter that ignores it.
-function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(signal.reason);
-    if (signal.aborted) onAbort();
-    else signal.addEventListener("abort", onAbort, { once: true });
-    // The promise is observed even when the signal was already aborted: the
-    // caller has started the work, and its rejection must not go unhandled.
-    promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
-  });
-}
-
-// Resolves once the promise settles, or after the grace period if it does not.
-function settledWithin(promise: Promise<unknown>, graceMs: number): Promise<void> {
-  return new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, graceMs);
-    promise.catch(() => undefined).finally(() => {
-      clearTimeout(timer);
-      resolve();
-    });
-  });
-}
 
 interface RunOneInput {
   competitor: Competitor;
@@ -87,9 +66,9 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
   let readySignalled = false;
   let settled = false;
   // Adapters keep running for a while after the lane gave up on them (a
-  // timed-out or cancelled child gets a grace period before SIGKILL, and
-  // every adapter signals ready from its catch block), and nothing they
-  // report then belongs to this lane, or to a benchmark started since.
+  // timed-out or cancelled child gets a grace period before SIGKILL), and
+  // nothing they report then belongs to this lane, or to a benchmark started
+  // since.
   const closed = () => settled || controller.signal.aborted;
   let adapterRun: Promise<AdapterRunOutput> | undefined;
 
@@ -112,9 +91,10 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
       },
       waitForStart: async () => {
         // The barrier opens when the last lane is ready or the first lane
-        // fails, and a lane stuck in setup fails on its own setup timer, so a
-        // ready lane carries no timer of its own while it waits here. Its
-        // failure would otherwise be reported as the harness not being ready.
+        // ends, ready or not, and a lane stuck in setup fails on its own setup
+        // timer, so a ready lane carries no timer of its own while it waits
+        // here. Its failure would otherwise be reported as the harness not
+        // being ready.
         clearTimeout(timeout);
         if (input.startGate) await untilAborted(input.startGate, controller.signal);
         if (controller.signal.aborted) throw controller.signal.reason;
@@ -241,9 +221,6 @@ async function runParallel(
           if (readyCount === competitors.length) release();
         },
       }).catch((error) => {
-        // Never strand healthy racers behind the readiness barrier when one
-        // process fails during setup.
-        release();
         // A cancelled lane is not a lane error; the benchmark as a whole is
         // cancelled once every lane has settled.
         if (!signal.aborted) {
@@ -256,7 +233,11 @@ async function runParallel(
           });
         }
         throw error;
-      });
+      })
+        // A lane that ends without ever being ready (failed during setup, or
+        // an adapter that never said so) must not strand the rest behind the
+        // barrier: they carry no timer of their own while they wait there.
+        .finally(release);
     });
 
   const settled = await Promise.allSettled(tasks);

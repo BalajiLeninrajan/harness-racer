@@ -200,7 +200,7 @@ describe("Antigravity adapter", () => {
       cwd: "/tmp/run", model: "nope", prompt: "x", signal: new AbortController().signal,
       onReady, waitForStart: async () => {}, onDelta: vi.fn(),
     })).rejects.toThrow(/exited with code 2: Error: unknown model/);
-    expect(onReady).toHaveBeenCalledOnce();
+    expect(onReady).not.toHaveBeenCalled();
   });
 
   it("fails the run when stdin errors instead of crashing the server", async () => {

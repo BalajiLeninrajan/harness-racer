@@ -3,6 +3,7 @@ import { createServer } from "node:net";
 import { createOpencodeClient } from "@opencode-ai/sdk/v2";
 
 import type { ModelOption } from "../../shared/types.js";
+import { abortError, runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 interface OpenCodeProcess {
@@ -11,12 +12,6 @@ interface OpenCodeProcess {
   // The tail of what the server has written to stderr so far.
   stderr: () => string;
   terminate: () => void;
-}
-
-function abortError(): Error {
-  const error = new Error("Benchmark cancelled");
-  error.name = "AbortError";
-  return error;
 }
 
 function recordFrom(value: unknown): Record<string, unknown> | undefined {
@@ -35,7 +30,9 @@ function freePort(): Promise<number> {
   });
 }
 
-async function startOpenCode(cwd: string): Promise<OpenCodeProcess> {
+// `onSpawn` receives the kill as soon as the server process exists, before
+// the wait for it to answer, so a run given up on during that wait can end it.
+async function startOpenCode(cwd: string, onSpawn?: (terminate: () => void) => void): Promise<OpenCodeProcess> {
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
   const child = spawn("opencode", ["serve", "--hostname=127.0.0.1", `--port=${port}`], {
@@ -57,6 +54,7 @@ async function startOpenCode(cwd: string): Promise<OpenCodeProcess> {
     }, 1_500);
     timer.unref();
   };
+  onSpawn?.(terminate);
   await new Promise<void>((resolve, reject) => {
     let attempts = 0;
     const timer = setInterval(() => {
@@ -115,36 +113,35 @@ async function loadInventory(cwd: string): Promise<{ models: ModelOption[]; defa
   }
 }
 
-async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
-  if (input.signal.aborted) throw abortError();
-  let server: OpenCodeProcess | undefined;
-  let ready = false;
-  const signalReady = () => {
-    if (!ready) {
-      ready = true;
-      input.onReady();
-    }
-  };
-  // Registered before the server is spawned, so a cancel during setup stops
-  // the SSE stream and kills the server instead of waiting for session.create.
-  const controller = new AbortController();
-  let iterator: AsyncIterator<unknown> | undefined;
-  const onAbort = () => {
-    controller.abort();
-    server?.terminate();
-  };
-  input.signal.addEventListener("abort", onAbort, { once: true });
-  try {
-    server = await startOpenCode(input.cwd);
-    if (input.signal.aborted) throw abortError();
-    const client = createOpencodeClient({ baseUrl: server.url, directory: input.cwd });
-    const model = parseModelId(input.model);
+interface OpenCodeSession {
+  client: ReturnType<typeof createOpencodeClient>;
+  cwd: string;
+  sessionId: string;
+  model: { providerID: string; modelID: string };
+  onDelta: (text: string) => void;
+  // The event stream, already pulled once: `first` is the event that proved
+  // it live, and the prompt's events follow it.
+  iterator: AsyncIterator<unknown>;
+  first: IteratorResult<unknown>;
+  streamFailure: (message: string) => Error;
+}
+
+const openCodePlan: SessionPlan<OpenCodeSession, void> = {
+  async open(ctx) {
+    // Registered before the server is spawned, so a cancel during setup stops
+    // the SSE stream and kills the server instead of waiting for session.create.
+    const controller = new AbortController();
+    ctx.onCleanup(() => controller.abort());
+    const server = await startOpenCode(ctx.cwd, ctx.onCleanup);
+    if (ctx.signal.aborted) throw abortError();
+    const client = createOpencodeClient({ baseUrl: server.url, directory: ctx.cwd });
+    const model = parseModelId(ctx.model);
     const created = await client.session.create({
-      directory: input.cwd,
+      directory: ctx.cwd,
       title: "Harness Racer benchmark",
       model: { id: model.modelID, providerID: model.providerID },
       permission: [{ permission: "*", pattern: "*", action: "deny" }],
-    }, { signal: input.signal });
+    }, { signal: ctx.signal });
     if (!created.data) throw new Error(`OpenCode session creation failed: ${JSON.stringify(created.error)}`);
     const sessionId = created.data.id;
     // The SDK counts the first connection as an attempt, so 1 means no
@@ -152,7 +149,7 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
     // with backoff until the run times out. The SDK only hands the failure to
     // onSseError before ending the stream, so it is kept for the error.
     let sseError: unknown;
-    const subscription = await client.event.subscribe({ directory: input.cwd }, {
+    const subscription = await client.event.subscribe({ directory: ctx.cwd }, {
       signal: controller.signal,
       sseMaxRetryAttempts: 1,
       onSseError: (error) => { sseError = error; },
@@ -160,7 +157,7 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
     const streamFailure = (message: string) => {
       const details = [
         ...(sseError !== undefined ? [`stream error: ${sseError instanceof Error ? sseError.message : String(sseError)}`] : []),
-        ...(server?.stderr() ? [`server stderr: ${server.stderr()}`] : []),
+        ...(server.stderr() ? [`server stderr: ${server.stderr()}`] : []),
       ];
       return new Error(`${message}${details.length ? ` (${details.join("; ")})` : ""}`);
     };
@@ -168,24 +165,29 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
     // first pulled. The server acknowledges a new subscriber with
     // server.connected, so the first event is the proof that the stream is
     // live, and any event the prompt produces after this point is delivered.
-    iterator = subscription.stream[Symbol.asyncIterator]();
+    const iterator = subscription.stream[Symbol.asyncIterator]();
+    // Leaving the loop early leaves the generator suspended at a yield;
+    // returning it runs the SDK's cleanup of the response reader.
+    ctx.onCleanup(() => void iterator.return?.().catch(() => undefined));
     const first = await iterator.next();
     if (first.done) throw streamFailure("OpenCode event stream could not be opened");
-    signalReady();
-    await input.waitForStart();
-    if (input.signal.aborted) throw abortError();
+    return { client, cwd: ctx.cwd, sessionId, model, onDelta: ctx.onDelta, iterator, first, streamFailure };
+  },
+
+  async prompt(session, text, signal) {
+    const { client, cwd, sessionId, iterator, onDelta } = session;
     const roles = new Map<string, string>();
     const emitted = new Map<string, string>();
     let idle = false;
     const prompt = await client.session.promptAsync({
       sessionID: sessionId,
-      directory: input.cwd,
-      model,
+      directory: cwd,
+      model: session.model,
       tools: {},
-      parts: [{ type: "text", text: input.prompt }],
-    }, { signal: input.signal });
+      parts: [{ type: "text", text }],
+    }, { signal });
     if (prompt.error) throw new Error(`OpenCode prompt failed: ${JSON.stringify(prompt.error)}`);
-    for (let next: IteratorResult<unknown> = first; !next.done; next = await iterator.next()) {
+    for (let next = session.first; !next.done; next = await iterator.next()) {
       const event = recordFrom(next.value);
       const properties = recordFrom(event?.properties);
       if (properties?.sessionID !== sessionId) continue;
@@ -198,12 +200,12 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
         if (part?.type === "text" && typeof part.id === "string" && typeof part.messageID === "string" && roles.get(part.messageID) === "assistant" && typeof part.text === "string") {
           const prior = emitted.get(part.id) ?? "";
           const delta = part.text.startsWith(prior) ? part.text.slice(prior.length) : part.text;
-          if (delta) input.onDelta(delta);
+          if (delta) onDelta(delta);
           emitted.set(part.id, part.text);
         }
       }
       if (event?.type === "message.part.delta" && typeof properties.messageID === "string" && roles.get(properties.messageID) === "assistant" && properties.field === "text" && typeof properties.delta === "string") {
-        input.onDelta(properties.delta);
+        onDelta(properties.delta);
         if (typeof properties.partID === "string") emitted.set(properties.partID, `${emitted.get(properties.partID) ?? ""}${properties.delta}`);
       }
       if (event?.type === "session.error") throw new Error(`OpenCode session failed: ${JSON.stringify(properties.error)}`);
@@ -213,20 +215,12 @@ async function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
       }
     }
     // The stream also ends cleanly on abort and when the server goes away.
-    if (!idle) throw streamFailure("OpenCode event stream ended before the session went idle");
-    return {};
-  } catch (error) {
-    signalReady();
-    if (input.signal.aborted) throw abortError();
-    throw error;
-  } finally {
-    input.signal.removeEventListener("abort", onAbort);
-    controller.abort();
-    // Leaving the loop early leaves the generator suspended at a yield;
-    // returning it runs the SDK's cleanup of the response reader.
-    void iterator?.return?.().catch(() => undefined);
-    server?.terminate();
-  }
+    if (!idle) throw session.streamFailure("OpenCode event stream ended before the session went idle");
+  },
+};
+
+function runOpenCode(input: AdapterRunInput): Promise<AdapterRunOutput> {
+  return runSession(input, openCodePlan);
 }
 
 export const openCodeAdapter = defineAdapter({

@@ -1,9 +1,11 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcessByStdio } from "node:child_process";
 import { accessSync, closeSync, constants, openSync, readSync, realpathSync, statSync } from "node:fs";
 import { delimiter, join } from "node:path";
-import { query, type Query } from "@anthropic-ai/claude-agent-sdk";
+import type { Readable, Writable } from "node:stream";
+import { startup, type Query, type SpawnOptions, type WarmQuery } from "@anthropic-ai/claude-agent-sdk";
 
 import type { ModelOption } from "../../shared/types.js";
+import { abortError, runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 // Claude Code has no model-listing surface: `claude` exposes no models subcommand, and the SDK's
@@ -18,6 +20,9 @@ const FAMILY_ORDER: Record<string, number> = { opus: 0, fable: 1, sonnet: 2, hai
 const UNRANKED_FAMILY = Object.keys(FAMILY_ORDER).length;
 const SCAN_CHUNK_BYTES = 4 * 1024 * 1024;
 const SCAN_OVERLAP_BYTES = 64;
+// How long the CLI gets to exit on SIGTERM before SIGKILL, the same as the
+// ACP lanes.
+const KILL_GRACE_MS = 1_500;
 
 interface ParsedModel {
   id: string;
@@ -141,12 +146,6 @@ interface CommandResult {
   stderr: string;
 }
 
-function abortError(): Error {
-  const error = new Error("Benchmark cancelled");
-  error.name = "AbortError";
-  return error;
-}
-
 function runCommand(args: string[]): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
     const child = spawn("claude", args, { env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"] });
@@ -192,63 +191,107 @@ function outputTokensFrom(value: unknown): number | undefined {
   return typeof candidate === "number" && Number.isFinite(candidate) ? candidate : undefined;
 }
 
-async function runClaude(input: AdapterRunInput): Promise<AdapterRunOutput> {
-  if (input.signal.aborted) throw abortError();
-  let runtime: Query | undefined;
-  let ready = false;
-  const signalReady = () => {
-    if (!ready) {
-      ready = true;
-      input.onReady();
-    }
-  };
+type ClaudeProcess = ChildProcessByStdio<Writable, Readable, null>;
 
-  try {
-    signalReady();
-    await input.waitForStart();
-    if (input.signal.aborted) throw abortError();
+interface ClaudeSession {
+  warm: WarmQuery;
+  onDelta: (text: string) => void;
+  // Set once the prompt is sent; the handle to close from then on, because
+  // WarmQuery.close() is a no-op after query().
+  runtime?: Query;
+}
 
-    runtime = query({
-      prompt: input.prompt,
+// Spawns the CLI on the SDK's behalf so the adapter keeps the child handle.
+// The SDK's own close() only ends stdin, waits 2 s before SIGTERM and another
+// 5 s before SIGKILL, and aborting its controller after close() is deferred
+// behind the same 2 s timer. All of that is past the engine's teardown grace,
+// so a cancelled or timed-out lane would leave a claude process streaming
+// from the API under the next lane, and under the workspace's deletion.
+function spawnClaude(options: SpawnOptions): ClaudeProcess {
+  return spawn(options.command, options.args, {
+    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+    env: options.env,
+    shell: false,
+    stdio: ["pipe", "pipe", "ignore"],
+    windowsHide: true,
+  });
+}
+
+function terminate(child: ClaudeProcess): void {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  child.kill("SIGTERM");
+  const timer = setTimeout(() => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  }, KILL_GRACE_MS);
+  timer.unref();
+}
+
+// The SDK's startup() spawns the CLI and completes its initialize handshake
+// before resolving, so the lane is ready at the same point as the ACP lanes:
+// process up, signed in, model chosen. query() then writes the prompt straight
+// to that process, and the CLI's boot no longer counts against the prompt.
+const claudePlan: SessionPlan<ClaudeSession> = {
+  async open(ctx) {
+    // Reaches the CLI while its handshake is still running, when there is no
+    // query handle to close yet.
+    const abortController = new AbortController();
+    let child: ClaudeProcess | undefined;
+    const session: Partial<ClaudeSession> & Pick<ClaudeSession, "onDelta"> = { onDelta: ctx.onDelta };
+    ctx.onCleanup(() => {
+      // close() first so the SDK stops reading and ends stdin; the kill then
+      // lands on a process the SDK already treats as aborted.
+      if (session.runtime) session.runtime.close();
+      else session.warm?.close();
+      abortController.abort();
+      if (child) terminate(child);
+    });
+    session.warm = await startup({
       options: {
-        cwd: input.cwd,
-        model: input.model,
+        cwd: ctx.cwd,
+        model: ctx.model,
         pathToClaudeCodeExecutable: "claude",
         includePartialMessages: true,
         maxTurns: 1,
         allowedTools: [],
         permissionMode: "plan",
         settingSources: ["user", "project", "local"],
+        abortController,
+        spawnClaudeCodeProcess: (options) => {
+          child = spawnClaude(options);
+          // Teardown can have run before the SDK got as far as spawning.
+          if (abortController.signal.aborted) terminate(child);
+          return child;
+        },
       },
     });
-    const onAbort = () => runtime?.close();
-    input.signal.addEventListener("abort", onAbort, { once: true });
+    return session as ClaudeSession;
+  },
+
+  async prompt(session, text, signal) {
+    const runtime = session.warm.query(text);
+    session.runtime = runtime;
     let streamed = "";
     let finalAssistant = "";
-    let nativeOutputTokens: number | undefined;
-    try {
-      for await (const message of runtime) {
-        if (input.signal.aborted) throw abortError();
-        const delta = claudeDelta(message);
-        if (delta) {
-          streamed += delta;
-          input.onDelta(delta);
-        }
-        if (recordFrom(message)?.type === "assistant") finalAssistant = assistantText(message);
-        if (recordFrom(message)?.type === "result") nativeOutputTokens = outputTokensFrom(message);
+    let result: unknown;
+    for await (const message of runtime) {
+      if (signal.aborted) throw abortError();
+      const delta = claudeDelta(message);
+      if (delta) {
+        streamed += delta;
+        session.onDelta(delta);
       }
-      if (!streamed && finalAssistant) input.onDelta(finalAssistant);
-      return nativeOutputTokens === undefined ? {} : { nativeOutputTokens };
-    } finally {
-      input.signal.removeEventListener("abort", onAbort);
+      if (recordFrom(message)?.type === "assistant") finalAssistant = assistantText(message);
+      if (recordFrom(message)?.type === "result") result = message;
     }
-  } catch (error) {
-    signalReady();
-    if (input.signal.aborted) throw abortError();
-    throw error;
-  } finally {
-    runtime?.close();
-  }
+    if (!streamed && finalAssistant) session.onDelta(finalAssistant);
+    return result;
+  },
+
+  tokens: outputTokensFrom,
+};
+
+function runClaude(input: AdapterRunInput): Promise<AdapterRunOutput> {
+  return runSession(input, claudePlan);
 }
 
 export const claudeAdapter = defineAdapter({

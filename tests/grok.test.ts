@@ -132,13 +132,38 @@ describe("Grok adapter", () => {
     expect(processes[0]?.requests.some((request) => request.method === "session/cancel")).toBe(false);
   });
 
-  it("terminates the agent when the probe handshake fails", async () => {
+  it("reports signed out when the agent rejects authenticate", async () => {
     behaviour.fail = ["authenticate"];
 
     const result = await grokAdapter.probe();
 
-    expect(result).toMatchObject({ installed: true, authenticated: false, message: expect.stringContaining("not signed in") });
+    expect(result).toMatchObject({ installed: true, authenticated: false, models: [], message: expect.stringContaining("not signed in") });
     expect(processes[1]?.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("leaves sign-in state unknown when the agent rejects initialize", async () => {
+    behaviour.fail = ["initialize"];
+
+    const result = await grokAdapter.probe();
+
+    // A refused handshake is not proof of a signed-out CLI, and false would
+    // hide Grok in both UIs; null keeps it listed with the message.
+    expect(result).toMatchObject({ installed: true, authenticated: null, message: expect.stringContaining("initialize failed") });
+    expect(processes[1]?.requests.some((request) => request.method === "authenticate")).toBe(false);
+    expect(processes[1]?.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("leaves sign-in state unknown when the agent exits during the probe handshake", async () => {
+    behaviour.hang = ["authenticate"];
+    const probe = grokAdapter.probe();
+    await vi.waitFor(() => expect(processes[1]?.requests.at(-1)?.method).toBe("authenticate"));
+    processes[1].stderr.emit("data", "segfault\n");
+    processes[1].exitCode = 139;
+    processes[1].emit("close", 139, null);
+
+    const result = await probe;
+
+    expect(result).toMatchObject({ installed: true, authenticated: null, message: expect.stringContaining("code 139: segfault") });
   });
 
   it("fails pending requests when stdin errors instead of crashing", async () => {
