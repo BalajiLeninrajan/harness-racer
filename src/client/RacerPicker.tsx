@@ -154,7 +154,7 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
         </span>
         <span className="racer-picker-copy cn-grow cn-stack cn-gap-4">
           <strong className="cn-truncate">{selected?.model.label ?? model}</strong>
-          <small className="cn-code-meta cn-truncate">{selected ? `${modelLabName(selected.model.id, selected.provider.id)} · via ${selected.provider.name}` : "Choose a model"}</small>
+          <small className="cn-meta cn-truncate">{selected ? `${modelLabName(selected.model.id, selected.provider.id)} · via ${selected.provider.name}` : "Choose a model"}</small>
         </span>
         <Pencil className="racer-picker-cue" size={15} />
       </button>
@@ -210,10 +210,10 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
                   aria-activedescendant={filtered[highlighted] ? `${listboxId}-${highlighted}` : undefined}
                 />
               </div>
-              <button type="button" className="btn-icon" aria-label="Close model picker" onClick={closeAndFocus}><X size={16} /></button>
+              <button type="button" className="btn is-icon" aria-label="Close model picker" onClick={closeAndFocus}><X size={16} /></button>
             </div>
             <div className="racer-picker-options" id={listboxId} role="listbox" aria-label={`${activeProvider?.name ?? "Harness"} models`}>
-              <div className="racer-picker-pane-label cn-row cn-microlabel cn-text-overlay-2" role="presentation" aria-hidden="true">
+              <div className="racer-picker-pane-label cn-row cn-label" role="presentation" aria-hidden="true">
                 {activeProvider && <><HarnessLogo harness={activeProvider.id} size={14} /><strong className="cn-text-subtext-1">{activeProvider.name}</strong></>}
                 <span className="cn-auto-l">{filtered.length} model{filtered.length === 1 ? "" : "s"}</span>
               </div>
@@ -233,8 +233,8 @@ export function RacerPicker({ providers, harness, model, onChange }: RacerPicker
                     onClick={() => choose(choice)}
                   >
                     <span className="racer-option-logo" aria-hidden="true"><ModelLabLogo model={choice.model.id} harness={choice.provider.id} size={18} /></span>
-                    <span className="cn-grow cn-stack cn-gap-4"><strong className="cn-truncate">{choice.model.label}</strong><small className="cn-code-meta cn-truncate">{modelLabName(choice.model.id, choice.provider.id)} · {choice.model.id}</small></span>
-                    {choice.model.isDefault && <em className="cn-microlabel cn-text-yellow">DEFAULT</em>}
+                    <span className="cn-grow cn-stack cn-gap-4"><strong className="cn-truncate">{choice.model.label}</strong><small className="cn-meta cn-truncate">{modelLabName(choice.model.id, choice.provider.id)} · <span className="cn-code-meta">{choice.model.id}</span></small></span>
+                    {choice.model.isDefault && <span className="tag cn-tone-yellow">Default</span>}
                     <Check className={isSelected ? "selected" : ""} size={15} />
                   </button>
                 );

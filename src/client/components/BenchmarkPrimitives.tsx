@@ -9,12 +9,12 @@ export function ModelMark({ harness, model }: { harness: HarnessId; model: strin
   );
 }
 
-/* Label-then-value in the DOM so it reads as "visible tok/s, 38.4"; the lane
-   flips it visually. `hero` is the package's headline-metric treatment. */
+/* A label over its value. `hero` is the package's large accent value; it
+   stays muted until `accent` says a live reading has arrived. */
 export function Metric({ label, value, accent, hero }: { label: string; value: string; accent?: boolean; hero?: boolean }) {
   return (
-    <div className={`metric is-value-first ${hero ? "is-hero" : ""} ${accent ? "metric-accent" : ""}`}>
-      <span className="cn-microlabel">{label}</span>
+    <div className={`stat ${hero ? "is-lg" : ""} ${accent ? "is-live" : ""}`}>
+      <span>{label}</span>
       <strong>{value}</strong>
     </div>
   );

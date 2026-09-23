@@ -15,7 +15,7 @@ export function AppHeader({ page, phase, socketState, onHome, onToggleAbout }: A
   return (
     <header className="topbar">
       <button className="wordmark cn-fit" disabled={phase === "running"} onClick={onHome} aria-label="Harness Racer home">
-        <span className="mark-solid" aria-hidden="true"><Gauge size={17} /></span>
+        <span className="mark" aria-hidden="true"><Gauge size={17} /></span>
         <em>harness</em>.racer
       </button>
       <div className={page === "about" ? "page-context cn-row cn-microlabel cn-text-mauve" : "stepper phase-track"} aria-label={page === "about" ? "Current page" : "Benchmark progress"}>
@@ -27,7 +27,7 @@ export function AppHeader({ page, phase, socketState, onHome, onToggleAbout }: A
         </>}
       </div>
       <div className="cn-row cn-end">
-        <button className="btn-flat about-button" aria-pressed={page === "about"} disabled={phase === "running"} onClick={onToggleAbout}><Info size={14} /> {page === "about" ? "Back to race" : "Methodology"}</button>
+        <button className="btn btn-ghost is-sm about-button" aria-pressed={page === "about"} disabled={phase === "running"} onClick={onToggleAbout}><Info size={14} /> {page === "about" ? "Back to race" : "Methodology"}</button>
         <div className={`chip ${socketState === "open" ? "cn-text-green" : socketState === "closed" ? "cn-text-red" : ""}`} role="status">
           {socketState === "open" ? <Wifi size={14} /> : socketState === "connecting" ? <LoaderCircle className="spin" size={14} /> : <WifiOff size={14} />}
           {socketState === "open" ? "engine ready" : socketState === "connecting" ? "waking up" : "engine offline"}

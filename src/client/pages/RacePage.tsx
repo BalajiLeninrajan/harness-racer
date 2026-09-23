@@ -43,16 +43,12 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
 
   return (
     <section className="race-view page-main page-enter" ref={raceRef}>
-      <div className="race-header cn-row cn-between cn-gap-28 cn-mb-22">
-        <div>
-          <div className="eyebrow"><span className="live-dot" /> LIVE TIMING</div>
-          <h1 className="cn-display cn-m-0">They’re off.</h1>
-        </div>
+      <div className="race-header cn-row cn-between cn-gap-32 cn-mb-24">
+        <h1 className="cn-display">They’re off.</h1>
         <div className="race-header-right cn-row cn-gap-16">
-          <div className="heat-switcher cn-row">
-            <span className={`cn-row ${activeWorkload === "prose" ? "active" : activeWorkload === "code" ? "is-done" : ""}`}><span>01</span> Attention paper</span>
-            <i />
-            <span className={`cn-row ${activeWorkload === "code" ? "active" : ""}`}><span>02</span> nanoGPT attention</span>
+          <div className="stepper heat-switcher" aria-label="Test texts">
+            <span className={activeWorkload === "prose" ? "active" : activeWorkload === "code" ? "is-done" : ""}><i>01</i>Attention paper</span>
+            <span className={activeWorkload === "code" ? "active" : ""}><i>02</i>nanoGPT attention</span>
           </div>
           <button className="btn btn-secondary is-sm" onClick={onCancel}><CircleStop /> Cancel</button>
         </div>
@@ -70,26 +66,26 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
           const elapsedFirstOutput = lane.status === "running" && lane.firstOutputMs === undefined && lane.runningStartedAt ? now - lane.runningStartedAt : lane.firstOutputMs;
           const laneProgress = Math.min(100, (lane.completedRuns / expectedPerLane) * 100);
           return (
-            <article className={`race-lane status-${lane.status}`} key={competitor.id} style={{ "--accent": competitor.color } as CSSProperties}>
+            <article className={`panel race-lane status-${lane.status}`} key={competitor.id} style={{ "--accent": competitor.color } as CSSProperties}>
               <div className="lane-head cn-row cn-gap-12">
                 <ModelMark harness={competitor.harness} model={competitor.model} />
-                <div className="lane-identity cn-grow cn-stack cn-gap-4"><strong>{competitor.label}</strong><span className="cn-code-meta cn-truncate">{competitor.model}</span></div>
-                <div className="cn-row cn-microlabel cn-nowrap">
+                <div className="lane-identity cn-grow cn-stack cn-gap-4"><strong className="cn-name">{competitor.label}</strong><span className="cn-code-meta cn-truncate">{competitor.model}</span></div>
+                <div className="cn-row cn-label cn-nowrap">
                   <span className="cn-text-overlay-0">P{index + 1}</span>
                   <span className={`cn-row cn-gap-4 ${lane.status === "running" ? "cn-text-accent" : lane.status === "complete" ? "cn-text-green" : lane.status === "error" ? "cn-text-red" : ""}`}>
-                    {lane.status === "running" ? <><span className="live-dot" /> STREAMING</> : lane.status === "starting" || lane.status === "ready" || lane.status === "queued" ? <><LoaderCircle className="spin" size={13} /> {lane.status.toUpperCase()}</> : lane.status === "error" ? <><AlertCircle size={13} /> ERROR</> : <><Check size={13} /> HEAT DONE</>}
+                    {lane.status === "running" ? <><span className="live-dot" /> Streaming</> : lane.status === "starting" || lane.status === "ready" || lane.status === "queued" ? <><LoaderCircle className="spin" size={13} /> {STATUS_LABELS[lane.status]}</> : lane.status === "error" ? <><AlertCircle size={13} /> Error</> : <><Check size={13} /> Heat done</>}
                   </span>
                 </div>
               </div>
               <div className="lane-metrics">
-                <Metric label="VISIBLE TOK/S" value={formatVisibleRate(lane.liveVisibleTokensPerSecond)} accent={lane.liveVisibleTokensPerSecond !== undefined} hero />
-                <Metric label="FIRST OUTPUT" value={formatMs(elapsedFirstOutput)} />
-                <Metric label="HARNESS PREP" value={formatMs(elapsedHarnessPrep)} />
+                <Metric label="Visible tok/s" value={formatVisibleRate(lane.liveVisibleTokensPerSecond)} accent={lane.liveVisibleTokensPerSecond !== undefined} hero />
+                <Metric label="First output" value={formatMs(elapsedFirstOutput)} />
+                <Metric label="Harness prep" value={formatMs(elapsedHarnessPrep)} />
               </div>
               <div className="terminal stream-window">
-                <div className="stream-toolbar cn-row cn-between cn-microlabel cn-text-overlay-0">
-                  <span className="cn-row"><Code2 size={13} /> {workloadFilename(lane.workload)}</span>
-                  <span>{lane.warmup ? "WARMUP" : lane.sample !== undefined ? `SAMPLE ${lane.sample}` : "QUEUED"}</span>
+                <div className="stream-toolbar cn-row cn-between cn-meta">
+                  <span className="cn-row cn-code-meta"><Code2 size={13} /> {workloadFilename(lane.workload)}</span>
+                  <span>{lane.warmup ? "Warmup" : lane.sample !== undefined ? `Sample ${lane.sample}` : "Queued"}</span>
                 </div>
                 <pre ref={(element) => { streamRefs.current[competitor.id] = element; }}>{lane.output || (lane.status === "error" ? lane.error : "Waiting for the green light…")}<span className={lane.status === "running" ? "caret" : "caret hidden"} /></pre>
               </div>
@@ -103,6 +99,8 @@ export function RacePage({ competitors, lanes, totalRuns, completedRuns, notice,
     </section>
   );
 }
+
+const STATUS_LABELS = { starting: "Starting", ready: "Ready", queued: "Queued" } as const;
 
 function workloadFilename(workload?: WorkloadId) {
   if (workload === "code") return "model.py";

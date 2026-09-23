@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" />
 <!-- catppuccin-neu design system, served from jsDelivr. Bump the tag here when the app's package.json pin changes. -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/BalajiLeninrajan/catppuccin-neu@v0.3.1/css/index.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/BalajiLeninrajan/catppuccin-neu@v0.4.0/css/index.css" />
 <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -23,7 +23,7 @@
 
   <header class="topbar is-split">
     <a class="wordmark" href="/">
-      <span class="mark-solid" aria-hidden="true">
+      <span class="mark" aria-hidden="true">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
       </span>
       <em>harness</em>.racer
@@ -36,17 +36,17 @@
 
   <main class="page-main">
     <section class="hero">
-      <div class="eyebrow">LOCAL HARNESS BENCHMARK</div>
+      <div class="cn-microlabel cn-text-mauve">Local harness benchmark</div>
       <h1 class="display-title">Race the agent CLIs already on your <em>machine</em>.</h1>
 
-      <div class="cn-cluster cn-mt-22 cn-mb-28">
+      <div class="cn-cluster cn-mt-24 cn-mb-32">
         <span class="chip">Codex CLI</span><span class="chip">Claude Code</span><span class="chip">Cursor Agent</span><span class="chip">Grok CLI</span><span class="chip">OpenCode</span>
       </div>
 
       <div class="command" id="command">
         <code class="command-text" id="cmd"><span class="command-prompt">$</span>npx harness-racer</code>
         <button
-          class="btn-icon command-copy"
+          class="btn is-icon command-copy"
           id="copy"
           type="button"
           data-command="npx harness-racer"
@@ -98,9 +98,9 @@
     <div class="scrim" aria-hidden="true"></div>
   </main>
 
-  <footer class="footer-neu">
-    <span class="footer-brand"><strong class="cn-name"><em>harness</em>.racer</strong><span>MIT licensed</span></span>
-    <span>Made with 💜 in Waterloo</span>
+  <footer class="page-footer">
+    <span class="wordmark is-sm"><em>harness</em>.racer<span>MIT licensed</span></span>
+    <span>Made in Waterloo</span>
   </footer>
 
 </div>
