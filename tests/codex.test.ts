@@ -1,13 +1,37 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { codexTurnStartParams } from "../src/server/adapters/codex.js";
 
-const processMocks = vi.hoisted(() => ({ execFile: vi.fn(), spawn: vi.fn() }));
-vi.mock("node:child_process", () => ({ execFile: processMocks.execFile, spawn: processMocks.spawn }));
+const processMocks = vi.hoisted(() => ({ spawn: vi.fn() }));
+vi.mock("node:child_process", () => ({ spawn: processMocks.spawn }));
 
 type Request = { id?: number; method: string; params?: Record<string, unknown> };
+
+// The one-shot `codex --version` child: exits with the output, or fails to spawn.
+function versionProcess(outcome: { stdout?: string; code?: number; error?: Error }) {
+  const child = Object.assign(new EventEmitter(), {
+    stdout: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
+    stderr: Object.assign(new EventEmitter(), { setEncoding: vi.fn() }),
+    exitCode: null as number | null,
+    signalCode: null as NodeJS.Signals | null,
+    kill: vi.fn(),
+  });
+  queueMicrotask(() => {
+    if (outcome.error) {
+      child.emit("error", outcome.error);
+      return;
+    }
+    if (outcome.stdout) child.stdout.emit("data", outcome.stdout);
+    child.exitCode = outcome.code ?? 0;
+    child.emit("close", child.exitCode, null);
+  });
+  return child;
+}
+
+// Returned from a responder to leave the request unanswered.
+const HANG = Symbol("hang");
 
 function fakeAppServer(
   respond: (request: Request, server: ReturnType<typeof fakeAppServer>) => unknown,
@@ -42,6 +66,7 @@ function fakeAppServer(
       if (request.id === undefined) continue;
       try {
         const result = respond(request, server);
+        if (result === HANG) continue;
         if (result instanceof Error) server.send({ id: request.id, error: { message: result.message } });
         else server.send({ id: request.id, result });
       } catch (error) {
@@ -66,9 +91,9 @@ function useAppServer(server: ReturnType<typeof fakeAppServer>): void {
 
 describe("Codex adapter protocol", () => {
   beforeEach(() => {
-    processMocks.execFile.mockReset();
     processMocks.spawn.mockReset();
   });
+  afterEach(() => vi.useRealTimers());
 
   it("uses the current app-server text input shape and explicit benchmark permissions", () => {
     expect(codexTurnStartParams("thread-1", "gpt-5.5", "Reply with the payload.")).toEqual({
@@ -93,7 +118,7 @@ describe("Codex adapter protocol", () => {
   });
 
   it("probes version, authentication, and paginated visible models", async () => {
-    processMocks.execFile.mockImplementation((_command, _args, _options, callback) => callback(null, "codex-cli 1.8.0\n"));
+    processMocks.spawn.mockImplementationOnce(() => versionProcess({ stdout: "codex-cli 1.8.0\n" }));
     const server = fakeAppServer((request) => {
       if (request.method === "initialize") return { userAgent: "codex-test" };
       if (request.method === "account/read") return { account: { email: "tester@example.com" } };
@@ -123,6 +148,34 @@ describe("Codex adapter protocol", () => {
       ],
     });
     expect(server.requests.filter(({ method }) => method === "model/list").map(({ params }) => params)).toEqual([{}, { cursor: "page-2" }]);
+    expect(processMocks.spawn).toHaveBeenNthCalledWith(1, "codex", ["--version"], expect.objectContaining({ stdio: ["ignore", "pipe", "pipe"] }));
+    expect(server.child.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("tells a missing CLI apart from one whose --version fails", async () => {
+    const { codexAdapter } = await import("../src/server/adapters/codex.js");
+
+    processMocks.spawn.mockImplementationOnce(() => versionProcess({ error: Object.assign(new Error("spawn codex ENOENT"), { code: "ENOENT" }) }));
+    await expect(codexAdapter.probe()).resolves.toMatchObject({ installed: false, authenticated: null, models: [], message: "Codex CLI is not installed" });
+
+    processMocks.spawn.mockImplementationOnce(() => versionProcess({ stdout: "error: config is invalid\n", code: 1 }));
+    await expect(codexAdapter.probe()).resolves.toMatchObject({ installed: true, authenticated: null, models: [], message: "error: config is invalid" });
+  });
+
+  it("gives up on an app-server that never answers initialize", async () => {
+    vi.useFakeTimers();
+    processMocks.spawn.mockImplementationOnce(() => versionProcess({ stdout: "codex-cli 1.8.0\n" }));
+    const server = fakeAppServer(() => HANG);
+    useAppServer(server);
+    const { codexAdapter } = await import("../src/server/adapters/codex.js");
+
+    const probe = codexAdapter.probe();
+    await vi.waitFor(() => expect(server.requests.map(({ method }) => method)).toEqual(["initialize"]));
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    await expect(probe).resolves.toMatchObject({
+      installed: true, authenticated: null, version: "1.8.0", models: [], message: "Codex app-server request 'initialize' timed out",
+    });
     expect(server.child.kill).toHaveBeenCalledWith("SIGTERM");
   });
 

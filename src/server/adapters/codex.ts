@@ -1,16 +1,20 @@
-import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface, type Interface as ReadlineInterface } from "node:readline";
 
 import type { ModelOption } from "../../shared/types.js";
+import { errorMessage, recordFrom, type JsonRecord } from "./lib/json.js";
+import { normalizeModels, probeFailure } from "./lib/probe.js";
+import { runCommand } from "./lib/process.js";
 import { abortError, runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 const COMMAND = "codex";
+const VERSION_TIMEOUT_MS = 5_000;
 const REQUEST_TIMEOUT_MS = 15_000;
 const RUN_TIMEOUT_MS = 120_000;
 
 type RpcId = number | string;
-type JsonObject = Record<string, unknown>;
+type JsonObject = JsonRecord;
 
 interface PendingRequest {
   resolve: (value: unknown) => void;
@@ -49,17 +53,11 @@ export function codexTurnStartParams(
 }
 
 function isObject(value: unknown): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return recordFrom(value) !== undefined;
 }
 
 function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
-}
-
-function errorMessage(value: unknown): string {
-  if (value instanceof Error) return value.message;
-  if (isObject(value) && typeof value.message === "string") return value.message;
-  return String(value);
 }
 
 function raceWithSignalAndTimeout<T>(
@@ -387,17 +385,10 @@ async function inspectCodex(cwd: string): Promise<InspectionResult> {
   }
 }
 
-function readVersion(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(COMMAND, ["--version"], { timeout: 5_000 }, (error, stdout) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      const value = stdout.trim().replace(/^codex-cli\s+/i, "");
-      resolve(value || stdout.trim());
-    });
-  });
+async function readVersion(): Promise<string> {
+  const result = await runCommand(COMMAND, ["--version"], { timeoutMs: VERSION_TIMEOUT_MS });
+  if (result.code !== 0) throw new Error(result.output || `${COMMAND} --version exited with code ${result.code}`);
+  return result.firstLine.replace(/^codex-cli\s+/i, "") || result.firstLine;
 }
 
 async function interruptTurn(client: CodexRpcClient, threadId: string, turnId: string): Promise<void> {
@@ -543,34 +534,21 @@ export const codexAdapter = defineAdapter({
     try {
       version = await readVersion();
     } catch (error) {
-      const code = isObject(error) ? error.code : undefined;
-      return {
-        installed: code !== "ENOENT",
-        authenticated: null,
-        models: [],
-        message: code === "ENOENT" ? "Codex CLI is not installed" : errorMessage(error),
-      };
+      const failure = probeFailure(error);
+      return failure.installed ? failure : { ...failure, message: "Codex CLI is not installed" };
     }
 
     try {
       const inspection = await inspectCodex(process.cwd());
-      const defaultModel = inspection.models.find((model) => model.isDefault)?.id;
       return {
         installed: true,
         authenticated: inspection.authenticated,
         version,
-        models: inspection.models,
-        ...(defaultModel ? { defaultModel } : {}),
+        ...normalizeModels(inspection.models),
         ...(!inspection.authenticated ? { message: "Sign in with the Codex CLI before benchmarking" } : {}),
       };
     } catch (error) {
-      return {
-        installed: true,
-        authenticated: null,
-        version,
-        models: [],
-        message: errorMessage(error),
-      };
+      return probeFailure(error, version);
     }
   },
 

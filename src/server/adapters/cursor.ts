@@ -1,73 +1,59 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
 import type { ModelOption } from "../../shared/types.js";
+import { errorMessage, outputTokensFrom, recordFrom, stringFrom, stripAnsi, type JsonRecord } from "./lib/json.js";
+import { bounded, normalizeModels, notInstalled, probeFailure, type ModelList } from "./lib/probe.js";
+import { runCommand } from "./lib/process.js";
 import { runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
 
 const CURSOR_COMMANDS = ["agent", "cursor-agent"] as const;
-const FALLBACK_MODELS: ModelOption[] = [
-  { id: "default", label: "Cursor Auto (dynamic)" },
-];
+// One-shot commands (--version, status) and the ACP model discovery each get
+// this long before the probe gives up on them.
+const PROBE_TIMEOUT_MS = 20_000;
 
+// The binary the last successful probe found, and why the last probe could
+// not find one. Only probes resolve the binary: a lane that spawned
+// --version in open() would pay that round trip in its own harness prep and
+// no other lane would, so the run path reads the cache and refuses without
+// it. A --version that fails or stalls while the binary is still there
+// leaves the cache alone; only a binary gone from PATH clears it.
 let resolvedCommand: string | undefined;
+let lastProbeFailure: Error | undefined;
 
-interface CommandResult {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-}
-
-function stripAnsi(value: string): string {
-  return value.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "");
-}
-
-function messageFrom(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function runCommand(command: string, args: string[], cwd?: string): Promise<CommandResult> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd,
-      env: process.env,
-      shell: false,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
-      stdout += chunk;
-    });
-    child.stderr.on("data", (chunk: string) => {
-      stderr += chunk;
-    });
-    child.once("error", reject);
-    child.once("close", (code) => resolve({ code, stdout, stderr }));
-  });
-}
-
-async function cursorCommand(): Promise<string> {
-  if (resolvedCommand) return resolvedCommand;
-
+/**
+ * Finds the installed Cursor binary by name, trying `agent` first. A binary
+ * that is present but fails or stalls on --version outranks one that is
+ * absent, and its own failure is what gets thrown: the fixed "not installed"
+ * message is only right when every candidate was missing from PATH.
+ */
+async function resolveCursorCommand(): Promise<{ command: string; version: string }> {
   let lastError: unknown;
   for (const candidate of CURSOR_COMMANDS) {
     try {
-      const result = await runCommand(candidate, ["--version"]);
+      const result = await runCommand(candidate, ["--version"], { timeoutMs: PROBE_TIMEOUT_MS });
       if (result.code === 0) {
         resolvedCommand = candidate;
-        return candidate;
+        lastProbeFailure = undefined;
+        return { command: candidate, version: result.firstLine };
       }
+      lastError = new Error(`${candidate} --version exited with code ${result.code}${result.output ? `: ${result.output}` : ""}`);
     } catch (error) {
-      lastError = error;
+      if (!notInstalled(error) || lastError === undefined) lastError = error;
     }
   }
+  const failure = lastError === undefined || notInstalled(lastError)
+    ? new Error("Cursor Agent is not installed or is not available on PATH", { cause: lastError })
+    : lastError instanceof Error ? lastError : new Error(errorMessage(lastError));
+  lastProbeFailure = failure;
+  if (notInstalled(failure)) resolvedCommand = undefined;
+  throw failure;
+}
 
-  const error = new Error("Cursor Agent is not installed or is not available on PATH");
-  if (lastError) (error as Error & { cause?: unknown }).cause = lastError;
-  throw error;
+/** The binary a lane spawns, as the last probe found it; never a --version of the lane's own. */
+function cursorCommand(): string {
+  if (resolvedCommand) return resolvedCommand;
+  throw lastProbeFailure ?? new Error("Cursor Agent has not been found by a probe yet; refresh the harness list");
 }
 
 function modelFromRecord(value: unknown): ModelOption | undefined {
@@ -75,32 +61,24 @@ function modelFromRecord(value: unknown): ModelOption | undefined {
     const id = value.trim();
     return id ? { id, label: id } : undefined;
   }
-  if (!value || typeof value !== "object") return undefined;
-
-  const record = value as Record<string, unknown>;
-  const id = messageFrom(record.id) ?? messageFrom(record.model) ?? messageFrom(record.slug) ?? messageFrom(record.value);
+  const record = recordFrom(value);
+  if (!record) return undefined;
+  const id = stringFrom(record.id) ?? stringFrom(record.model) ?? stringFrom(record.slug) ?? stringFrom(record.value);
   if (!id) return undefined;
-  const label = messageFrom(record.label) ?? messageFrom(record.name) ?? id;
+  const label = stringFrom(record.label) ?? stringFrom(record.name) ?? id;
   const isDefault = record.isDefault === true || record.default === true || record.selected === true;
   return { id, label, ...(isDefault ? { isDefault: true } : {}) };
 }
 
 function modelsFromJson(value: unknown): ModelOption[] {
   if (Array.isArray(value)) return value.map(modelFromRecord).filter((model): model is ModelOption => Boolean(model));
-  if (!value || typeof value !== "object") return [];
-
-  const record = value as Record<string, unknown>;
+  const record = recordFrom(value);
+  if (!record) return [];
   for (const key of ["models", "data", "items", "availableModels"]) {
     if (Array.isArray(record[key])) return modelsFromJson(record[key]);
   }
   const single = modelFromRecord(record);
   return single ? [single] : [];
-}
-
-type JsonRecord = Record<string, unknown>;
-
-function recordFrom(value: unknown): JsonRecord | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : undefined;
 }
 
 function configOptionsFrom(value: unknown): JsonRecord[] {
@@ -140,22 +118,9 @@ function concreteCurrentModel(session: unknown): string | undefined {
   return current && current !== "default" && current !== "auto" ? current : undefined;
 }
 
-function outputTokensFrom(value: unknown): number | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const record = value as JsonRecord;
-  for (const candidate of [record.outputTokens, record.output_tokens, record.completionTokens, record.completion_tokens]) {
-    if (typeof candidate === "number" && Number.isFinite(candidate)) return candidate;
-  }
-  for (const nested of [record.usage, record.tokenUsage, record.result]) {
-    const tokens = outputTokensFrom(nested);
-    if (tokens !== undefined) return tokens;
-  }
-  return undefined;
-}
-
 function rpcError(method: string, error: unknown): Error {
-  if (!error || typeof error !== "object") return new Error(`Cursor ACP ${method} failed`);
-  const record = error as JsonRecord;
+  const record = recordFrom(error);
+  if (!record) return new Error(`Cursor ACP ${method} failed`);
   const detail = typeof record.message === "string" ? record.message : JSON.stringify(error);
   return new Error(`Cursor ACP ${method} failed: ${detail}`);
 }
@@ -195,11 +160,16 @@ class CursorAcpConnection {
     this.child.stdin.on("error", (error) => this.failAll(error));
     this.child.once("close", (code, signal) => {
       this.closed = true;
-      const detail = stripAnsi(this.stderr).trim();
+      const detail = this.stderrTail();
       this.failAll(new Error(
         `Cursor ACP exited with ${signal ? `signal ${signal}` : `code ${code}`}${detail ? `: ${detail}` : ""}`,
       ));
     });
+  }
+
+  /** The last 16 KiB the agent wrote to stderr, ANSI stripped and trimmed. */
+  stderrTail(): string {
+    return stripAnsi(this.stderr).trim();
   }
 
   request(method: string, params: unknown): Promise<unknown> {
@@ -237,14 +207,13 @@ class CursorAcpConnection {
 
   private acceptLine(line: string): void {
     if (!line.trim()) return;
-    let message: JsonRecord;
+    let message: JsonRecord | undefined;
     try {
-      const parsed: unknown = JSON.parse(line);
-      if (!parsed || typeof parsed !== "object") return;
-      message = parsed as JsonRecord;
+      message = recordFrom(JSON.parse(line));
     } catch {
       return;
     }
+    if (!message) return;
 
     if (typeof message.id === "number" && ("result" in message || "error" in message) && !message.method) {
       const pending = this.pending.get(message.id);
@@ -265,13 +234,10 @@ class CursorAcpConnection {
 
   private handleAgentRequest(message: JsonRecord): void {
     if (message.method === "session/request_permission") {
-      const params = message.params && typeof message.params === "object" ? message.params as JsonRecord : {};
+      const params = recordFrom(message.params) ?? {};
       const options = Array.isArray(params.options) ? params.options : [];
-      const rejectOption = options.find((option) => {
-        if (!option || typeof option !== "object") return false;
-        return String((option as JsonRecord).kind).startsWith("reject");
-      }) as JsonRecord | undefined;
-      const optionId = rejectOption && typeof rejectOption.optionId === "string" ? rejectOption.optionId : undefined;
+      const rejectOption = options.map(recordFrom).find((option) => String(option?.kind).startsWith("reject"));
+      const optionId = stringFrom(rejectOption?.optionId);
       this.write({
         jsonrpc: "2.0",
         id: message.id,
@@ -294,41 +260,43 @@ class CursorAcpConnection {
   }
 }
 
-interface CursorDiscovery {
-  models: ModelOption[];
-  defaultModel?: string;
+async function handshake(connection: CursorAcpConnection, cwd: string, clientName: string): Promise<unknown> {
+  await connection.request("initialize", {
+    protocolVersion: 1,
+    clientCapabilities: {
+      fs: { readTextFile: false, writeTextFile: false },
+      terminal: false,
+      _meta: { parameterizedModelPicker: true },
+    },
+    clientInfo: { name: clientName, version: "0.1.0" },
+  });
+  await connection.request("authenticate", { methodId: "cursor_login" });
+  return connection.request("session/new", { cwd, mcpServers: [] });
 }
 
-async function discoverCursorModels(): Promise<CursorDiscovery> {
-  const command = await cursorCommand();
+async function listModels(connection: CursorAcpConnection, cwd: string): Promise<ModelList> {
+  const session = await handshake(connection, cwd, "harness-racer-model-probe");
+  const response = await connection.request("cursor/list_available_models", {});
+  const models = modelsFromJson(response).filter((model) => model.id !== "auto" && model.id !== "default");
+  return normalizeModels(models, concreteCurrentModel(session));
+}
+
+async function discoverCursorModels(command: string): Promise<ModelList> {
   const connection = new CursorAcpConnection(command, process.cwd(), () => {});
   try {
-    await connection.request("initialize", {
-      protocolVersion: 1,
-      clientCapabilities: {
-        fs: { readTextFile: false, writeTextFile: false },
-        terminal: false,
-        _meta: { parameterizedModelPicker: true },
+    // request() takes no signal, so the bound ends the process instead; its
+    // close rejects whatever the handshake is waiting on. The agent's stderr
+    // is the only place a stall explains itself (a browser sign-in it is
+    // waiting on, say), so the timeout carries it.
+    return await bounded(
+      listModels(connection, process.cwd()),
+      PROBE_TIMEOUT_MS,
+      () => {
+        const detail = connection.stderrTail();
+        return `Cursor ACP model discovery did not finish within ${Math.round(PROBE_TIMEOUT_MS / 1000)}s${detail ? `: ${detail}` : ""}`;
       },
-      clientInfo: { name: "harness-racer-model-probe", version: "0.1.0" },
-    });
-    await connection.request("authenticate", { methodId: "cursor_login" });
-    const session = await connection.request("session/new", { cwd: process.cwd(), mcpServers: [] });
-    const response = await connection.request("cursor/list_available_models", {});
-    const discovered = modelsFromJson(response)
-      .filter((model) => model.id !== "auto" && model.id !== "default");
-    const models = [...new Map(discovered.map((model) => [model.id, model])).values()];
-    const current = concreteCurrentModel(session);
-    const defaultModel = current && models.some((model) => model.id === current)
-      ? current
-      : models[0]?.id;
-    return {
-      models: models.map((model) => ({
-        ...model,
-        ...(model.id === defaultModel ? { isDefault: true } : {}),
-      })),
-      defaultModel,
-    };
+      () => connection.terminate(),
+    );
   } finally {
     connection.terminate();
   }
@@ -341,42 +309,26 @@ interface CursorSession {
 
 const cursorPlan: SessionPlan<CursorSession> = {
   async open(ctx) {
-    const command = await cursorCommand();
+    const command = cursorCommand();
     let sessionId: string | undefined;
     const connection = new CursorAcpConnection(command, ctx.cwd, (method, params) => {
-      if (method !== "session/update" || !params || typeof params !== "object") return;
-      const notification = params as JsonRecord;
-      if (sessionId && notification.sessionId !== sessionId) return;
-      if (!notification.update || typeof notification.update !== "object") return;
-      const update = notification.update as JsonRecord;
-      if (update.sessionUpdate !== "agent_message_chunk" || !update.content || typeof update.content !== "object") return;
-      const content = update.content as JsonRecord;
-      if (content.type === "text" && typeof content.text === "string" && content.text) ctx.onDelta(content.text);
+      if (method !== "session/update") return;
+      const notification = recordFrom(params);
+      if (sessionId && notification?.sessionId !== sessionId) return;
+      const update = recordFrom(notification?.update);
+      const content = recordFrom(update?.content);
+      if (update?.sessionUpdate === "agent_message_chunk" && content?.type === "text" && typeof content.text === "string" && content.text) ctx.onDelta(content.text);
     });
     ctx.onCleanup(() => connection.terminate());
 
-    await connection.request("initialize", {
-      protocolVersion: 1,
-      clientCapabilities: {
-        fs: { readTextFile: false, writeTextFile: false },
-        terminal: false,
-        _meta: { parameterizedModelPicker: true },
-      },
-      clientInfo: { name: "harness-racer", version: "0.1.0" },
-    });
-    await connection.request("authenticate", { methodId: "cursor_login" });
-    const created = await connection.request("session/new", { cwd: ctx.cwd, mcpServers: [] });
-    if (!created || typeof created !== "object" || typeof (created as JsonRecord).sessionId !== "string") {
-      throw new Error("Cursor ACP session/new returned no sessionId");
-    }
-    sessionId = (created as JsonRecord).sessionId as string;
+    const created = await handshake(connection, ctx.cwd, "harness-racer");
+    sessionId = stringFrom(recordFrom(created)?.sessionId);
+    if (!sessionId) throw new Error("Cursor ACP session/new returned no sessionId");
     if (ctx.model === "auto" || ctx.model === "default") {
       throw new Error("Cursor Auto is dynamic and cannot be used for an attributable speed benchmark. Select a concrete model.");
     }
     const modelConfig = findConfigOption(created, "model");
-    const modelConfigId = typeof modelConfig?.id === "string" && modelConfig.id.trim()
-      ? modelConfig.id.trim()
-      : "model";
+    const modelConfigId = stringFrom(modelConfig?.id) ?? "model";
     const availableModels = configOptionValues(modelConfig);
     if (availableModels.length > 0 && !availableModels.includes(ctx.model)) {
       throw new Error(`Cursor ACP does not advertise model ${ctx.model}. Refresh the model list and choose a concrete model.`);
@@ -423,53 +375,48 @@ export const cursorAdapter = defineAdapter({
 }, {
   async probe(): Promise<AdapterProbeResult> {
     let command: string;
+    let version: string;
     try {
-      command = await cursorCommand();
+      ({ command, version } = await resolveCursorCommand());
     } catch (error) {
-      return {
-        installed: false,
-        authenticated: null,
-        message: error instanceof Error ? error.message : String(error),
-        models: [],
-      };
+      return probeFailure(error);
     }
 
-    const [versionResult, statusResult] = await Promise.all([
-      runCommand(command, ["--version"]),
-      runCommand(command, ["status", "--format", "json"]),
-    ]);
-    let authenticated: boolean | null = statusResult.code === 0 ? true : null;
+    let authenticated: boolean | null;
+    let statusMessage: string | undefined;
     try {
-      const status = JSON.parse(statusResult.stdout) as Record<string, unknown>;
-      const explicit = status.loggedIn ?? status.authenticated ?? status.isAuthenticated;
-      if (typeof explicit === "boolean") authenticated = explicit;
-    } catch {
-      const statusText = `${statusResult.stdout}\n${statusResult.stderr}`;
-      if (/not\s+(?:logged|signed)\s+in|unauthenticated|login required/i.test(statusText)) authenticated = false;
+      const status = await runCommand(command, ["status", "--format", "json"], { timeoutMs: PROBE_TIMEOUT_MS });
+      authenticated = status.code === 0 ? true : null;
+      try {
+        const parsed = recordFrom(JSON.parse(status.stdout)) ?? {};
+        const explicit = parsed.loggedIn ?? parsed.authenticated ?? parsed.isAuthenticated;
+        if (typeof explicit === "boolean") authenticated = explicit;
+      } catch {
+        const statusText = `${status.stdout}\n${status.stderr}`;
+        if (/not\s+(?:logged|signed)\s+in|unauthenticated|login required/i.test(statusText)) authenticated = false;
+      }
+      if (status.code !== 0) statusMessage = stripAnsi(status.stderr || status.stdout).trim();
+    } catch (error) {
+      return probeFailure(error, version);
     }
 
-    let models: ModelOption[] = [];
-    let defaultModel: string | undefined;
+    // Without a model list Cursor is not runnable, and the reason is the
+    // message: the old "default" stand-in was an id the run path refuses.
+    let listed: ModelList = { models: [] };
     let modelMessage: string | undefined;
     if (authenticated !== false) {
       try {
-        const discovery = await discoverCursorModels();
-        models = discovery.models;
-        defaultModel = discovery.defaultModel;
+        listed = await discoverCursorModels(command);
       } catch (error) {
-        modelMessage = error instanceof Error ? error.message : String(error);
+        modelMessage = errorMessage(error);
       }
     }
-    if (models.length === 0) models = FALLBACK_MODELS.map((model) => ({ ...model }));
-    defaultModel ??= models.find((model) => model.isDefault)?.id ?? models[0]?.id;
-    const statusMessage = statusResult.code === 0 ? undefined : stripAnsi(statusResult.stderr || statusResult.stdout).trim();
 
     return {
       installed: true,
       authenticated,
-      version: stripAnsi(versionResult.stdout || versionResult.stderr).trim().split(/\r?\n/)[0],
-      models,
-      defaultModel,
+      version,
+      ...listed,
       message: modelMessage ?? statusMessage ?? undefined,
     };
   },

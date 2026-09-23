@@ -3,8 +3,15 @@ import { createServer } from "node:net";
 import { createOpencodeClient } from "@opencode-ai/sdk/v2";
 
 import type { ModelOption } from "../../shared/types.js";
+import { errorMessage, recordFrom } from "./lib/json.js";
+import { bounded, normalizeModels, probeFailure, type ModelList } from "./lib/probe.js";
+import { runCommand } from "./lib/process.js";
 import { abortError, runSession, type SessionPlan } from "./lib/run.js";
 import { defineAdapter, type AdapterProbeResult, type AdapterRunInput, type AdapterRunOutput } from "./types.js";
+
+// The --version spawn and the provider listing each get this long before the
+// probe gives up on them. The server's own start is bounded separately below.
+const PROBE_TIMEOUT_MS = 20_000;
 
 interface OpenCodeProcess {
   child: ChildProcess;
@@ -12,10 +19,6 @@ interface OpenCodeProcess {
   // The tail of what the server has written to stderr so far.
   stderr: () => string;
   terminate: () => void;
-}
-
-function recordFrom(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 }
 
 function freePort(): Promise<number> {
@@ -88,11 +91,20 @@ function parseModelId(value: string): { providerID: string; modelID: string } {
   return { providerID: value.slice(0, separator), modelID: value.slice(separator + 1) };
 }
 
-async function loadInventory(cwd: string): Promise<{ models: ModelOption[]; defaultModel?: string }> {
+async function loadInventory(cwd: string): Promise<ModelList> {
   const server = await startOpenCode(cwd);
+  const deadline = new AbortController();
   try {
     const client = createOpencodeClient({ baseUrl: server.url, directory: cwd });
-    const response = await client.provider.list({ directory: cwd });
+    const response = await bounded(
+      client.provider.list({ directory: cwd }, { signal: deadline.signal }),
+      PROBE_TIMEOUT_MS,
+      `OpenCode provider listing did not finish within ${Math.round(PROBE_TIMEOUT_MS / 1000)}s`,
+      () => {
+        deadline.abort();
+        server.terminate();
+      },
+    );
     if (!response.data) throw new Error(`OpenCode provider discovery failed: ${JSON.stringify(response.error)}`);
     const connected = new Set(response.data.connected);
     const models: ModelOption[] = [];
@@ -103,11 +115,7 @@ async function loadInventory(cwd: string): Promise<{ models: ModelOption[]; defa
       }
     }
     const defaultEntry = Object.entries(response.data.default).find(([providerID]) => connected.has(providerID));
-    const defaultModel = defaultEntry ? `${defaultEntry[0]}/${defaultEntry[1]}` : models[0]?.id;
-    return {
-      models: models.map((model) => ({ ...model, ...(model.id === defaultModel ? { isDefault: true } : {}) })),
-      defaultModel,
-    };
+    return normalizeModels(models, defaultEntry ? `${defaultEntry[0]}/${defaultEntry[1]}` : undefined);
   } finally {
     server.terminate();
   }
@@ -156,7 +164,7 @@ const openCodePlan: SessionPlan<OpenCodeSession, void> = {
     });
     const streamFailure = (message: string) => {
       const details = [
-        ...(sseError !== undefined ? [`stream error: ${sseError instanceof Error ? sseError.message : String(sseError)}`] : []),
+        ...(sseError !== undefined ? [`stream error: ${errorMessage(sseError)}`] : []),
         ...(server.stderr() ? [`server stderr: ${server.stderr()}`] : []),
       ];
       return new Error(`${message}${details.length ? ` (${details.join("; ")})` : ""}`);
@@ -229,45 +237,27 @@ export const openCodeAdapter = defineAdapter({
   command: "opencode",
 }, {
   async probe(): Promise<AdapterProbeResult> {
-    let version = "";
+    let version: string;
     try {
-      const child = spawn("opencode", ["--version"], { env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"] });
-      let output = "";
-      child.stdout.setEncoding("utf8");
-      child.stderr.setEncoding("utf8");
-      child.stdout.on("data", (chunk: string) => { output += chunk; });
-      child.stderr.on("data", (chunk: string) => { output += chunk; });
-      const code = await new Promise<number | null>((resolve, reject) => {
-        child.once("error", reject);
-        child.once("close", resolve);
-      });
-      if (code !== 0) throw new Error(output.trim() || `OpenCode exited with code ${code}`);
-      version = output.trim().split(/\r?\n/)[0] ?? "";
+      const result = await runCommand("opencode", ["--version"], { timeoutMs: PROBE_TIMEOUT_MS });
+      if (result.code !== 0) throw new Error(result.output || `opencode --version exited with code ${result.code}`);
+      version = result.firstLine;
     } catch (error) {
-      return {
-        installed: false,
-        authenticated: null,
-        models: [],
-        message: error instanceof Error ? error.message : String(error),
-      };
+      return probeFailure(error);
     }
     try {
-      const inventory = await loadInventory(process.cwd());
+      const listed = await loadInventory(process.cwd());
       return {
         installed: true,
-        authenticated: inventory.models.length > 0,
+        authenticated: listed.models.length > 0,
         version,
-        models: inventory.models,
-        defaultModel: inventory.defaultModel,
+        ...listed,
       };
     } catch (error) {
-      return {
-        installed: true,
-        authenticated: false,
-        version,
-        models: [],
-        message: error instanceof Error ? error.message : String(error),
-      };
+      // A server that did not start, a listing that stalled or a transport
+      // error says nothing about sign-in; only a listing with no connected
+      // provider does, and that is the length check above.
+      return probeFailure(error, version);
     }
   },
 

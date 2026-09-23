@@ -1,16 +1,42 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Server as HttpServer } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
-import { isHarnessId, type BenchmarkRequest, type ClientMessage, type ServerEvent } from "../shared/types.js";
+import { isHarnessId, type BenchmarkRequest, type ClientMessage, type ProviderInfo, type ServerEvent } from "../shared/types.js";
 import { adapters } from "./adapters/index.js";
+import { errorMessage } from "./adapters/lib/json.js";
 import { runBenchmark } from "./benchmark.js";
+
+// A probe sweep spawns every installed CLI. The web client asks twice on
+// every page load (the mount fetch and the socket's push) and again on each
+// reconnect, so one sweep is shared while it runs and for a short while after.
+const PROVIDERS_TTL_MS = 3_000;
+
+let providersMemo: { sweep: Promise<ProviderInfo[]>; freshUntil: number } | undefined;
 
 function send(socket: WebSocket, event: ServerEvent): void {
   if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(event));
 }
 
-export async function getProviders() {
-  return Promise.all(adapters.map((adapter) => adapter.probe()));
+async function probeAll(): Promise<ProviderInfo[]> {
+  // Adapters built with defineAdapter never reject, but the sweep is the
+  // browser's whole picture and one rejection must not blank it.
+  const outcomes = await Promise.allSettled(adapters.map((adapter) => adapter.probe()));
+  return outcomes.map((outcome, index) => {
+    if (outcome.status === "fulfilled") return outcome.value;
+    const { id, name, command } = adapters[index]!;
+    return { id, name, command, installed: false, authenticated: null, models: [], message: errorMessage(outcome.reason) };
+  });
+}
+
+export function getProviders(): Promise<ProviderInfo[]> {
+  if (providersMemo && Date.now() < providersMemo.freshUntil) return providersMemo.sweep;
+  const memo = { sweep: probeAll(), freshUntil: Infinity };
+  providersMemo = memo;
+  memo.sweep.then(
+    () => { memo.freshUntil = Date.now() + PROVIDERS_TTL_MS; },
+    () => { if (providersMemo === memo) providersMemo = undefined; },
+  );
+  return memo.sweep;
 }
 
 export async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
