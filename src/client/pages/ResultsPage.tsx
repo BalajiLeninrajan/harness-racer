@@ -1,4 +1,4 @@
-import { ArrowLeft, RotateCcw } from "lucide-react";
+import { ArrowLeft, Flag, RotateCcw } from "lucide-react";
 import type { CSSProperties, KeyboardEvent } from "react";
 import type { Competitor, RunResult, SummaryRow } from "../../shared/types";
 import { ModelLabLogo } from "../BrandLogo";
@@ -22,13 +22,22 @@ const enterToggles = (event: KeyboardEvent) => {
   if (event.key === "Enter") (event.target as HTMLInputElement).click();
 };
 
+// Non-breaking hyphens keep a model id like GPT-5.6-Terra on one line.
+const headlineName = (row: SummaryRow) => `${harnessLabel(row)} with ${row.competitor.label.replaceAll("-", "\u2011")}`;
+
+/* The server gives the finish crown to every stack within 1% of the best
+   time, so a runner-up holding it finished level, not behind. */
+const isDeadHeat = (row: SummaryRow | undefined) => row?.crowns.includes("finish") ?? false;
+
 function Headline({ ranked }: { ranked: SummaryRow[] }) {
   const [winner, runnerUp] = ranked;
   if (!winner) return <h1 className="cn-display">No stack finished a valid run.</h1>;
-  // Non-breaking hyphens keep a model id like GPT-5.6-Terra on one line.
-  const name = `${harnessLabel(winner)} with ${winner.competitor.label.replaceAll("-", "\u2011")}`;
-  if (!runnerUp) return <h1 className="cn-display">{name} is the only <em>finisher</em>.</h1>;
-  return <h1 className="cn-display">{name} wins by <em>{formatMs(runnerUp.promptToFinishMs - winner.promptToFinishMs)}</em>.</h1>;
+  if (!runnerUp) return <h1 className="cn-display">{headlineName(winner)} is the only <em>finisher</em>.</h1>;
+  if (isDeadHeat(runnerUp)) {
+    const level = ranked.filter(isDeadHeat).map(headlineName);
+    return <h1 className="cn-display">{level.slice(0, -1).join(", ")} and {level.at(-1)} finish <em>level</em>.</h1>;
+  }
+  return <h1 className="cn-display">{headlineName(winner)} wins by <em>{formatMs(runnerUp.promptToFinishMs - winner.promptToFinishMs)}</em>.</h1>;
 }
 
 /* Photo finish: every stack on one time axis, with the winner's median as a
@@ -57,7 +66,7 @@ function FinishChart({ ranked }: { ranked: SummaryRow[] }) {
               </span>
               <div className="hr-track">
                 <div className="progress-track is-lg"><span /></div>
-                {row === runnerUp && <div className="hr-gap" aria-hidden="true"><b>+{formatMs(row.promptToFinishMs - winner.promptToFinishMs)}</b></div>}
+                {row === runnerUp && !isDeadHeat(row) && <div className="hr-gap" aria-hidden="true"><b>+{formatMs(row.promptToFinishMs - winner.promptToFinishMs)}</b></div>}
               </div>
               <strong className="hr-label cn-value">{formatMs(row.promptToFinishMs)}</strong>
             </li>
@@ -111,12 +120,20 @@ export function ResultsPage({ competitors, results, summary, onEditGrid, onRaceA
     <section className="page-main page-enter cn-stack cn-gap-32" style={{ "--page-width": "1120px" } as CSSProperties}>
       <header>
         <Headline ranked={ranked} />
-        <p className="lede">Median prompt to finish over {plural(runsEach, "run")} per stack, split between the attention paper and nanoGPT's self-attention code.</p>
+        <p className="lede">
+          {ranked.length > 0
+            ? `Median prompt to finish over ${plural(runsEach, "run")} per stack, split between the attention paper and nanoGPT's self-attention code.`
+            : summary.length > 0 ? "Every stack was disqualified. The details below say why." : "The race ended without any results."}
+        </p>
         <div className="cn-row">
           <button className="btn btn-secondary" onClick={onEditGrid}><ArrowLeft /> Edit grid</button>
           <button className="btn btn-primary" onClick={onRaceAgain}><RotateCcw /> Race again</button>
         </div>
       </header>
+
+      {ranked.length === 0 && (
+        <div className="empty-state panel"><Flag /><strong>No finish to show</strong><span>A stack needs at least one valid run to get a time.</span></div>
+      )}
 
       {ranked.length > 0 && (
         <div className="hr-body">

@@ -42,6 +42,18 @@ describe("summary sentences", () => {
     ]);
   });
 
+  it("names every holder of a shared best", () => {
+    const ranked = [
+      row({}, 4200, 1, ["finish", "coldStart"]),
+      { ...row({ harness: "claudeAgent", model: "opus", label: "Opus" }, 5500, 2, ["coldStart", "visibleSpeed"]), coldStartToFirstOutputMs: 2090 },
+      row({ harness: "cursor", model: "gemini", label: "Gemini" }, 8100, 3, ["visibleSpeed"]),
+    ];
+    expect(summarySentences(ranked)).toEqual([
+      "The winner and Opus in Claude shared the quickest cold start at 2.09s.",
+      "Opus in Claude and Gemini in Cursor shared the fastest stream at 90.0 tok/s.",
+    ]);
+  });
+
   it("says nothing without a ranked stack", () => {
     expect(summarySentences([])).toEqual([]);
   });

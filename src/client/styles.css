@@ -136,8 +136,10 @@
 
 /* The margin: a bracket from the finish line to the runner-up's time,
    the same number as the headline. */
-.hr-gap { position: absolute; z-index: 1; bottom: 22px; left: calc(var(--finish) / var(--scale) * 100% + 3px); width: calc((var(--t) - var(--finish)) / var(--scale) * 100% - 3px); height: 6px; border: 1px solid var(--overlay-2); border-bottom: 0; border-radius: var(--cn-radius-chip) var(--cn-radius-chip) 0 0; }
-.hr-gap b { position: absolute; bottom: calc(100% + var(--space-1)); left: 50%; translate: -50% 0; color: var(--text); font: var(--cn-type-label-weight) var(--cn-type-label-size)/1 var(--sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hr-gap { position: absolute; z-index: 1; bottom: 22px; left: calc(var(--finish) / var(--scale) * 100% + 3px); width: max(calc((var(--t) - var(--finish)) / var(--scale) * 100% - 3px), var(--space-3)); height: 6px; border: 1px solid var(--overlay-2); border-bottom: 0; border-radius: var(--cn-radius-chip) var(--cn-radius-chip) 0 0; }
+/* The label starts at the bracket's left end, clear of the finish line, and
+   keeps an opaque ground so the chequer never runs through the number. */
+.hr-gap b { position: absolute; bottom: calc(100% + var(--space-1)); left: 0; padding-inline: var(--space-1); background: var(--base); color: var(--text); font: var(--cn-type-label-weight) var(--cn-type-label-size)/1 var(--sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .hr-axis { height: 16px; margin: 0 calc(var(--hr-pad) + var(--hr-tail)) var(--space-4) calc(var(--hr-pad) + var(--hr-lead)); }
 .hr-axis span { position: absolute; left: calc(var(--at) / var(--scale) * 100%); translate: -50% 0; }

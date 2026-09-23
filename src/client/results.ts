@@ -21,25 +21,33 @@ const joinPhrases = (phrases: string[]) =>
   phrases.length < 2 ? phrases.join("") : `${phrases.slice(0, -1).join(", ")} and ${phrases.at(-1)}`;
 
 /* The race in sentences: who took the other bests, and what the harness
-   alone cost when one model ran in two harnesses. Ranked rows only. */
+   alone cost when one model ran in two harnesses. Ranked rows only. The
+   server crowns every stack within 1% of a best, so a best can be shared;
+   the sentence then names every holder and quotes the best value. */
 export function summarySentences(ranked: SummaryRow[]): string[] {
   const winner = ranked[0];
   if (!winner) return [];
 
-  const bests: Array<{ crown: SummaryRow["crowns"][number]; phrase: (row: SummaryRow) => string }> = [
-    { crown: "firstOutput", phrase: (row) => `the fastest first output at ${formatMs(row.promptToFirstOutputMs)}` },
-    { crown: "coldStart", phrase: (row) => `the quickest cold start at ${formatMs(row.coldStartToFirstOutputMs)}` },
-    { crown: "visibleSpeed", phrase: (row) => `the fastest stream at ${formatVisibleRate(row.visibleTokensPerSecond)} tok/s` },
+  const bests: Array<{ crown: SummaryRow["crowns"][number]; score: (row: SummaryRow) => number; phrase: (row: SummaryRow) => string }> = [
+    { crown: "firstOutput", score: (row) => row.promptToFirstOutputMs, phrase: (row) => `the fastest first output at ${formatMs(row.promptToFirstOutputMs)}` },
+    { crown: "coldStart", score: (row) => row.coldStartToFirstOutputMs, phrase: (row) => `the quickest cold start at ${formatMs(row.coldStartToFirstOutputMs)}` },
+    { crown: "visibleSpeed", score: (row) => -row.visibleTokensPerSecond, phrase: (row) => `the fastest stream at ${formatVisibleRate(row.visibleTokensPerSecond)} tok/s` },
   ];
-  const byRow = new Map<SummaryRow, string[]>();
+  const byHolders = new Map<string, { rows: SummaryRow[]; phrases: string[] }>();
   for (const best of bests) {
-    const holder = ranked.find((row) => row.crowns.includes(best.crown));
-    if (holder) byRow.set(holder, [...(byRow.get(holder) ?? []), best.phrase(holder)]);
+    const holders = ranked.filter((row) => row.crowns.includes(best.crown));
+    if (holders.length === 0) continue;
+    const top = holders.reduce((a, b) => (best.score(b) < best.score(a) ? b : a));
+    const key = holders.map((row) => row.competitor.id).join(" ");
+    const group = byHolders.get(key) ?? { rows: holders, phrases: [] };
+    group.phrases.push(best.phrase(top));
+    byHolders.set(key, group);
   }
 
-  const sentences = [...byRow].map(([row, phrases]) =>
-    row === winner ? `The winner also had ${joinPhrases(phrases)}.` : `${stackName(row)} had ${joinPhrases(phrases)}.`,
-  );
+  const sentences = [...byHolders.values()].map(({ rows, phrases }) => {
+    if (rows.length > 1) return `${joinPhrases(rows.map((row) => (row === winner ? "The winner" : stackName(row))))} shared ${joinPhrases(phrases)}.`;
+    return rows[0] === winner ? `The winner also had ${joinPhrases(phrases)}.` : `${stackName(rows[0])} had ${joinPhrases(phrases)}.`;
+  });
 
   for (const [index, faster] of ranked.entries()) {
     const slower = ranked.slice(index + 1).find((row) => row.competitor.model === faster.competitor.model && row.competitor.harness !== faster.competitor.harness);
