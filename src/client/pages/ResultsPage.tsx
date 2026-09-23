@@ -1,8 +1,9 @@
-import { AlertCircle, ArrowLeft, Flag, RotateCcw } from "lucide-react";
-import type { CSSProperties } from "react";
+import { ArrowLeft, Flag, RotateCcw } from "lucide-react";
+import type { CSSProperties, KeyboardEvent } from "react";
 import type { Competitor, RunResult, SummaryRow } from "../../shared/types";
-import { formatMs, formatVisibleRate, ordinal } from "../benchmark";
-import { ModelMark } from "../components/BenchmarkPrimitives";
+import { ModelLabLogo } from "../BrandLogo";
+import { formatMs, formatVisibleRate } from "../benchmark";
+import { finishAxis, harnessLabel, summarySentences } from "../results";
 
 interface ResultsPageProps {
   competitors: Competitor[];
@@ -12,93 +13,184 @@ interface ResultsPageProps {
   onRaceAgain: () => void;
 }
 
-export function ResultsPage({ competitors, results, summary, onEditGrid, onRaceAgain }: ResultsPageProps) {
-  const invalidResults = results.filter((result) => !result.valid && !result.warmup);
-  const eligibleSummary = summary.filter((row) => !row.disqualified);
+const seconds = (ms: number) => ms / 1000;
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+/* The recipe's checkbox loses the disclosure's native Enter, so the label
+   restores it; Space still toggles the input natively. */
+const enterToggles = (event: KeyboardEvent) => {
+  if (event.key === "Enter") (event.target as HTMLInputElement).click();
+};
+
+// Non-breaking hyphens keep a model id like GPT-5.6-Terra on one line.
+const headlineName = (row: SummaryRow) => `${harnessLabel(row)} with ${row.competitor.label.replaceAll("-", "\u2011")}`;
+
+/* The server gives the finish crown to every stack within 1% of the best
+   time, so a runner-up holding it finished level, not behind. */
+const isDeadHeat = (row: SummaryRow | undefined) => row?.crowns.includes("finish") ?? false;
+
+function Headline({ ranked }: { ranked: SummaryRow[] }) {
+  const [winner, runnerUp] = ranked;
+  if (!winner) return <h1 className="cn-display">No stack finished a valid run.</h1>;
+  if (!runnerUp) return <h1 className="cn-display">{headlineName(winner)} is the only <em>finisher</em>.</h1>;
+  if (isDeadHeat(runnerUp)) {
+    const level = ranked.filter(isDeadHeat).map(headlineName);
+    return <h1 className="cn-display">{level.slice(0, -1).join(", ")} and {level.at(-1)} finish <em>level</em>.</h1>;
+  }
+  return <h1 className="cn-display">{headlineName(winner)} wins by <em>{formatMs(runnerUp.promptToFinishMs - winner.promptToFinishMs)}</em>.</h1>;
+}
+
+/* Photo finish: every stack on one time axis, with the winner's median as a
+   chequered line through all the lanes. What runs past the line is how far
+   behind that stack finished. */
+function FinishChart({ ranked }: { ranked: SummaryRow[] }) {
+  const { scaleMs, ticksMs } = finishAxis(Math.max(...ranked.map((row) => row.promptToFinishMs)));
+  const [winner, runnerUp] = ranked;
+  const chartVars = { "--scale": seconds(scaleMs), "--finish": seconds(winner.promptToFinishMs) } as CSSProperties;
 
   return (
-    <section className="page-main page-enter" style={{ "--page-width": "1120px" } as CSSProperties}>
-      <div className="cn-mb-24">
-        <h1 className="cn-display">Photo finish.</h1>
-        <p className="cn-copy cn-mt-12 cn-mb-0">Median harness + model result across valid paper and Python runs.</p>
+    <section className="panel" aria-labelledby="finish-title">
+      <header className="panel-header">
+        <h2 id="finish-title">Prompt to finish</h2>
+        <span className="cn-meta">median</span>
+      </header>
+      <div className="hr-chart" style={chartVars}>
+        <ol className="cn-list-none cn-divide cn-m-0">
+          {ranked.map((row) => (
+            <li className="hr-lane" key={row.competitor.id} style={{ "--t": seconds(row.promptToFinishMs), "--accent": row.competitor.color } as CSSProperties}>
+              <span className="cn-meta">{row.finishRank}</span>
+              <span className="mark" aria-hidden="true"><ModelLabLogo harness={row.competitor.harness} model={row.competitor.model} size={16} /></span>
+              <span className="hr-label cn-stack cn-gap-4 cn-min-0">
+                <b className="cn-name cn-truncate">{row.competitor.label}</b>
+                <span className="cn-meta cn-truncate">{harnessLabel(row)}{row.anomalousRuns > 0 && `, ${row.validRuns} of ${row.measuredRuns} runs valid`}</span>
+              </span>
+              <div className="hr-track">
+                <div className="progress-track is-lg"><span /></div>
+                {row === runnerUp && !isDeadHeat(row) && <div className="hr-gap" aria-hidden="true"><b>+{formatMs(row.promptToFinishMs - winner.promptToFinishMs)}</b></div>}
+              </div>
+              <strong className="hr-label cn-value">{formatMs(row.promptToFinishMs)}</strong>
+            </li>
+          ))}
+        </ol>
+        <span className="hr-finish" aria-hidden="true" />
       </div>
+      <div className="hr-chart hr-axis cn-meta" style={chartVars} aria-hidden="true">
+        {ticksMs.map((tick) => <span key={tick} style={{ "--at": seconds(tick) } as CSSProperties}>{tick === 0 ? "0s" : formatMs(tick).replace(/\.0+s$/, "s")}</span>)}
+      </div>
+    </section>
+  );
+}
 
-      {eligibleSummary.length >= 3 && (
-        <div className="podium-showcase well cn-mb-16">
-          <ol className="podium-grid cn-list-none" aria-label="Top three finishers">
-            {eligibleSummary.slice(0, 3).map((row) => (
-              <li className={`podium-entry rank-${row.finishRank}`} key={row.competitor.id} style={{ "--accent": row.competitor.color } as CSSProperties}>
-                <div className="podium-identity cn-text-center">
-                  <span className="cn-microlabel cn-text-accent">{ordinal(row.finishRank)}</span>
-                  <ModelMark harness={row.competitor.harness} model={row.competitor.model} />
-                  <strong className="cn-w-full cn-truncate">{row.competitor.label}</strong>
-                  <small className="cn-w-full cn-code-meta cn-truncate">{row.competitor.model}</small>
-                  <b>{formatMs(row.promptToFinishMs)}</b>
-                </div>
-                <div className="podium-step" aria-hidden="true"><span>{row.finishRank}</span></div>
-              </li>
-            ))}
-          </ol>
+/* The one tilted panel: the race in a few sentences and three numbers. */
+function RaceSummary({ ranked, summary }: { ranked: SummaryRow[]; summary: SummaryRow[] }) {
+  const winner = ranked[0];
+  const last = ranked.at(-1) ?? winner;
+  const validRuns = summary.reduce((total, row) => total + row.validRuns, 0);
+  const measuredRuns = summary.reduce((total, row) => total + row.measuredRuns, 0);
+  const sentences = summarySentences(ranked);
+  return (
+    <aside className="panel is-tilted" aria-labelledby="summary-title">
+      <header className="panel-header"><h2 id="summary-title">Summary</h2></header>
+      <div className="cn-divide">
+        {sentences.length > 0 && (
+          <div className="panel-body cn-stack cn-gap-12">
+            {sentences.map((sentence) => <p className="cn-copy cn-m-0" key={sentence}>{sentence}</p>)}
+          </div>
+        )}
+        <div className="panel-body cn-divide">
+          <div className="stat is-inline"><span>Winning time</span><strong>{formatMs(winner.promptToFinishMs)}</strong></div>
+          {ranked.length > 2 && <div className="stat is-inline"><span>First to last</span><strong>{formatMs(last.promptToFinishMs - winner.promptToFinishMs)}</strong></div>}
+          <div className="stat is-inline"><span>Valid runs</span><strong>{validRuns} of {measuredRuns}</strong></div>
         </div>
+      </div>
+    </aside>
+  );
+}
+
+export function ResultsPage({ competitors, results, summary, onEditGrid, onRaceAgain }: ResultsPageProps) {
+  const invalidResults = results.filter((result) => !result.valid && !result.warmup);
+  const ranked = summary.filter((row) => !row.disqualified);
+  const disqualified = summary.length - ranked.length;
+  const validRuns = results.filter((result) => result.valid && !result.warmup).length;
+  const runsEach = Math.max(0, ...summary.map((row) => row.measuredRuns));
+  const racerName = (id: string) => competitors.find((item) => item.id === id)?.label ?? "Unknown racer";
+  const leftOutNames = [...new Set(invalidResults.map((result) => racerName(result.competitorId)))];
+
+  return (
+    <section className="page-main page-enter cn-stack cn-gap-32" style={{ "--page-width": "1120px" } as CSSProperties}>
+      <header>
+        <Headline ranked={ranked} />
+        <p className="lede">
+          {ranked.length > 0
+            ? `Median prompt to finish over ${plural(runsEach, "run")} per stack, split between the attention paper and nanoGPT's self-attention code.`
+            : summary.length > 0 ? "Every stack was disqualified. The details below say why." : "The race ended without any results."}
+        </p>
+        <div className="cn-row">
+          <button className="btn btn-secondary" onClick={onEditGrid}><ArrowLeft /> Edit grid</button>
+          <button className="btn btn-primary" onClick={onRaceAgain}><RotateCcw /> Race again</button>
+        </div>
+      </header>
+
+      {ranked.length === 0 && (
+        <div className="empty-state panel"><Flag /><strong>No finish to show</strong><span>A stack needs at least one valid run to get a time.</span></div>
       )}
 
-      {eligibleSummary.length === 0 && (
-        <div className="empty-state panel"><AlertCircle /><strong>No eligible finishers</strong><span>Recorded results are shown below as disqualified.</span></div>
+      {ranked.length > 0 && (
+        <div className="hr-body">
+          <FinishChart ranked={ranked} />
+          <RaceSummary ranked={ranked} summary={summary} />
+        </div>
       )}
 
       {summary.length > 0 && (
-        <div className="results-table panel">
-          <div className="panel-header table-title"><div className="cn-row cn-text-mauve"><Flag size={18} /><h2>Full classification</h2></div><span className="cn-meta">{results.filter((result) => result.valid && !result.warmup).length} valid runs{summary.some((row) => row.disqualified) ? ` · ${summary.filter((row) => row.disqualified).length} DSQ` : ""}</span></div>
-          <div className="table-scroll">
-            <table className="data-table">
-              <caption className="cn-sr-only">Harness and model stacks with disqualified racers listed after ranked finishers</caption>
-              <thead><tr><th scope="col">Place</th><th scope="col">Harness + model</th><th scope="col">Prompt → first</th><th scope="col">Cold start → first</th><th scope="col">Visible tok/s</th><th scope="col">Prompt → finish</th><th scope="col">Runs</th></tr></thead>
-              <tbody>
-                {summary.map((row) => (
-                  <tr className={row.disqualified ? "disqualified" : row.anomalousRuns > 0 ? "has-anomalies" : undefined} key={row.competitor.id}>
-                    <td><span className={`position-badge ${row.disqualified ? "position-dsq" : `position-${row.finishRank}`}`}>{row.disqualified ? "DSQ" : row.finishRank}</span></td>
-                    <td><div className="table-racer cn-row"><span className="table-lane-swatch" style={{ background: row.competitor.color }} /><ModelMark harness={row.competitor.harness} model={row.competitor.model} /><div className="cell-name cn-grow cn-stack cn-gap-4"><strong className="cn-truncate">{row.competitor.label}</strong><small className="cn-code-meta cn-truncate">{row.competitor.model}</small>{row.anomalousRuns > 0 && <span className={`tag cn-fit ${row.disqualified ? "cn-tone-red" : "cn-tone-peach"}`}>{row.disqualified ? "all runs anomalous" : `${row.anomalousRuns} anomalous ${row.anomalousRuns === 1 ? "run" : "runs"}`}</span>}</div></div></td>
-                    <td data-label="Prompt → first">{formatMs(row.promptToFirstOutputMs)}{row.crowns.includes("firstOutput") && <span className="tag cn-tone-yellow best-tag">Best</span>}</td>
-                    <td data-label="Cold → first">{formatMs(row.coldStartToFirstOutputMs)}{row.crowns.includes("coldStart") && <span className="tag cn-tone-yellow best-tag">Best</span>}</td>
-                    <td data-label="Visible tok/s">{formatVisibleRate(row.visibleTokensPerSecond)}{row.crowns.includes("visibleSpeed") && <span className="tag cn-tone-yellow best-tag">Best</span>}</td>
-                    <td data-label="Prompt → finish">{formatMs(row.promptToFinishMs)}{row.crowns.includes("finish") && <span className="tag cn-tone-yellow best-tag">Best</span>}</td>
-                    <td data-label="Runs">{row.anomalousRuns > 0 ? `${row.validRuns}/${row.measuredRuns}` : row.measuredRuns}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {invalidResults.length > 0 && (
-        <div className="accordion invalid-results cn-mt-12">
-          {/* The recipe's checkbox loses the disclosure's native Enter, so the
-              label restores it; Space still toggles the input natively. */}
-          <label onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).click(); }}>
-            <input type="checkbox" />
-            <span className="cn-row"><AlertCircle size={15} className="cn-text-peach" /> {invalidResults.length} {invalidResults.length === 1 ? "run anomaly" : "run anomalies"}</span>
-          </label>
-          <div className="fold">
-            <div className="cn-divide">
-              {invalidResults.map((result, index) => {
-                const competitor = competitors.find((item) => item.id === result.competitorId);
-                return (
-                  <p key={`${result.competitorId}-${result.workload}-${result.sample}-${index}`}>
-                    <strong>{competitor?.label ?? "Unknown racer"} · {result.workload} · sample {result.sample}</strong>
-                    <span>{result.validationMessage ?? "The output was not valid for ranking."}</span>
-                  </p>
-                );
-              })}
+        <section className="panel" aria-label="Details">
+          <div className="accordion-stack">
+            <div className="accordion">
+              <label onKeyDown={enterToggles}>
+                <input type="checkbox" />
+                <b>Full classification</b>
+                <span className="cn-meta">{plural(summary.length, "stack")}, {plural(validRuns, "valid run")}{disqualified > 0 && `, ${disqualified} disqualified`}</span>
+              </label>
+              <div className="fold"><div>
+                <table className="data-table">
+                  <caption className="cn-sr-only">Every stack's medians in finishing order, with disqualified stacks last</caption>
+                  <thead><tr><th scope="col">Place</th><th scope="col">Harness and model</th><th scope="col">Prompt to first</th><th scope="col">Cold start to first</th><th scope="col">Visible tok/s</th><th scope="col">Prompt to finish</th><th scope="col">Runs</th></tr></thead>
+                  <tbody>
+                    {summary.map((row) => (
+                      <tr key={row.competitor.id}>
+                        <td data-label="Place">{row.disqualified ? <span className="tag cn-tone-red">DSQ</span> : row.finishRank}</td>
+                        <td><div className="cell-name cn-stack cn-gap-4"><strong>{row.competitor.label}</strong><small>{harnessLabel(row)}</small></div></td>
+                        <td data-label="Prompt to first">{formatMs(row.promptToFirstOutputMs)}</td>
+                        <td data-label="Cold start to first">{formatMs(row.coldStartToFirstOutputMs)}</td>
+                        <td data-label="Visible tok/s">{formatVisibleRate(row.visibleTokensPerSecond)}</td>
+                        <td data-label="Prompt to finish">{formatMs(row.promptToFinishMs)}</td>
+                        <td data-label="Runs">{row.anomalousRuns > 0 ? `${row.validRuns}/${row.measuredRuns}` : row.measuredRuns}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div></div>
             </div>
+            {invalidResults.length > 0 && (
+              <div className="accordion">
+                <label onKeyDown={enterToggles}>
+                  <input type="checkbox" />
+                  <b>{plural(invalidResults.length, "run")} left out</b>
+                  <span className="cn-meta cn-truncate">{leftOutNames.join(", ")}</span>
+                </label>
+                <div className="fold"><div><div className="cn-stack cn-gap-12">
+                  {invalidResults.map((result, index) => (
+                    <p className="cn-copy cn-m-0" key={`${result.competitorId}-${result.workload}-${result.sample}-${index}`}>
+                      <b className="cn-text-text">{racerName(result.competitorId)}, {result.workload === "prose" ? "attention paper" : "nanoGPT code"}, sample {result.sample}.</b>{" "}
+                      {result.validationMessage ?? "The output was not valid for ranking."}
+                    </p>
+                  ))}
+                </div></div></div>
+              </div>
+            )}
           </div>
-        </div>
+        </section>
       )}
-
-      <div className="results-actions cn-row cn-center cn-mt-24">
-        <button className="btn btn-secondary" onClick={onEditGrid}><ArrowLeft /> Edit grid</button>
-        <button className="btn btn-primary" onClick={onRaceAgain}><RotateCcw /> Race again</button>
-      </div>
     </section>
   );
 }
