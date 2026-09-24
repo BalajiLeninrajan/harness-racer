@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ spawn: vi.fn() }));
 vi.mock("node:child_process", () => ({ spawn: mocks.spawn }));
 
 type FakeChild = EventEmitter & {
-  stdin: { write: ReturnType<typeof vi.fn> };
+  stdin: EventEmitter & { write: ReturnType<typeof vi.fn> };
   stdout: EventEmitter & { setEncoding: ReturnType<typeof vi.fn> };
   stderr: EventEmitter & { setEncoding: ReturnType<typeof vi.fn> };
   exitCode: number | null;
@@ -15,7 +15,7 @@ type FakeChild = EventEmitter & {
 
 function commandProcess(stdout: string, stderr = "", code = 0) {
   const child = new EventEmitter() as FakeChild;
-  child.stdin = { write: vi.fn() };
+  child.stdin = Object.assign(new EventEmitter(), { write: vi.fn() });
   child.stdout = Object.assign(new EventEmitter(), { setEncoding: vi.fn() });
   child.stderr = Object.assign(new EventEmitter(), { setEncoding: vi.fn() });
   child.exitCode = code;
@@ -29,20 +29,21 @@ function commandProcess(stdout: string, stderr = "", code = 0) {
   return child;
 }
 
-function acpProcess(responses: Record<string, unknown>) {
+// Requests named in `hang` are left unanswered.
+function acpProcess(responses: Record<string, unknown>, hang: string[] = []) {
   const child = new EventEmitter() as FakeChild;
   child.stdout = Object.assign(new EventEmitter(), { setEncoding: vi.fn() });
   child.stderr = Object.assign(new EventEmitter(), { setEncoding: vi.fn() });
   child.exitCode = null;
   child.signalCode = null;
   child.kill = vi.fn(() => { child.signalCode = "SIGTERM"; return true; });
-  child.stdin = { write: vi.fn((line: string) => {
+  child.stdin = Object.assign(new EventEmitter(), { write: vi.fn((line: string) => {
     const request = JSON.parse(line) as { id?: number; method: string; params?: unknown };
-    if (request.id === undefined) return true;
+    if (request.id === undefined || hang.includes(request.method)) return true;
     const result = responses[request.method];
     queueMicrotask(() => child.stdout.emit("data", `${JSON.stringify({ jsonrpc: "2.0", id: request.id, result })}\n`));
     return true;
-  }) };
+  }) });
   return child;
 }
 
@@ -110,6 +111,24 @@ describe("Cursor adapter", () => {
     ]);
     expect(requests[3].params).toEqual({ sessionId: "session-1", configId: "model-picker", value: "gpt-5" });
     expect(requests[4].params).toEqual({ sessionId: "session-1", configId: "mode", value: "ask" });
+    expect(acp.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("fails pending requests when stdin errors instead of crashing", async () => {
+    let acp!: FakeChild;
+    mocks.spawn
+      .mockImplementationOnce(() => commandProcess("1.2\n"))
+      .mockImplementationOnce(() => (acp = acpProcess({ initialize: {} }, ["authenticate"])));
+    const { cursorAdapter } = await import("../src/server/adapters/cursor.js");
+
+    const run = cursorAdapter.run({
+      model: "gpt-5", prompt: "test", cwd: "/tmp/project", signal: new AbortController().signal,
+      onReady: vi.fn(), waitForStart: vi.fn(), onDelta: vi.fn(),
+    });
+    await vi.waitFor(() => expect(acp.stdin.write).toHaveBeenCalledTimes(2));
+    acp.stdin.emit("error", new Error("write EPIPE"));
+
+    await expect(run).rejects.toThrow("write EPIPE");
     expect(acp.kill).toHaveBeenCalledWith("SIGTERM");
   });
 
