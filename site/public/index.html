@@ -119,7 +119,7 @@
   // The npm and GitHub buttons are the page's only ways out.
   document.querySelectorAll("[data-outbound]").forEach(function (a) {
     a.addEventListener("click", function () {
-      posthog.capture("outbound_link", { destination: a.getAttribute("data-outbound") });
+      posthog.capture("outbound_link", { destination: a.getAttribute("data-outbound"), location: "header" });
     });
   });
 </script>
