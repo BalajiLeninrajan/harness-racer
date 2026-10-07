@@ -33,6 +33,7 @@
   }
 
   btn.addEventListener("click", function () {
+    posthog.capture("copy_command", { button: "install" });
     write(btn.getAttribute("data-command")).then(
       function () {
         command.classList.add("is-copied");

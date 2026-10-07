@@ -22,6 +22,12 @@ soon as the app's lane was redesigned. Keep it that way: if the page ever needs
 to show real app chrome again, share a source with `src/client` rather than
 copying one.
 
+PostHog analytics loads from the standard snippet in `index.html`'s `<head>`,
+in cookieless mode, so the page sets no cookies and writes nothing to browser
+storage. On top of pageviews and autocapture it sends `copy_command` from
+`copy.js` and `outbound_link` from the npm and GitHub buttons. This is the
+landing page only; the CLI package and its local web app send nothing.
+
 The `catppuccin-neu` design system is not installed here. `index.html` links
 it straight from jsDelivr, pinned to a git tag. When the app bumps its
 `catppuccin-neu` version in the root `package.json`, bump the tag in that
