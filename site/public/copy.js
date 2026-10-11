@@ -38,6 +38,9 @@
         command.classList.add("is-copied");
         btn.setAttribute("data-tip", "Copied");
         btn.setAttribute("aria-label", "Copied");
+        // Counted only once the copy lands, and guarded so analytics can
+        // never break the button.
+        if (window.posthog) posthog.capture("copy_command", { button: "install" });
       },
       function () {
         // Selecting the text is the honest fallback: the user copies it. The
