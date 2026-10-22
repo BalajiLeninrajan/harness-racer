@@ -1,9 +1,11 @@
 import { EventEmitter } from "node:events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { spawnMock, processes } = vi.hoisted(() => ({
+const { spawnMock, processes, behaviour } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
   processes: [] as FakeProcess[],
+  // Requests the fake agent leaves unanswered or answers with an error.
+  behaviour: { hang: [] as string[], fail: [] as string[] },
 }));
 
 vi.mock("node:child_process", () => ({ spawn: spawnMock }));
@@ -18,11 +20,16 @@ class FakeProcess extends EventEmitter {
   exitCode: number | null = null;
   signalCode: NodeJS.Signals | null = null;
   requests: Array<Record<string, unknown>> = [];
-  stdin = {
+  stdin = Object.assign(new EventEmitter(), {
     write: (line: string) => {
       const request = JSON.parse(line) as Record<string, unknown>;
       this.requests.push(request);
       if (typeof request.id !== "number") return true;
+      if (behaviour.hang.includes(String(request.method))) return true;
+      if (behaviour.fail.includes(String(request.method))) {
+        queueMicrotask(() => this.stdout.emit("data", `${JSON.stringify({ jsonrpc: "2.0", id: request.id, error: { message: "not signed in" } })}\n`));
+        return true;
+      }
       let result: unknown = {};
       if (request.method === "session/new") {
         result = {
@@ -45,7 +52,7 @@ class FakeProcess extends EventEmitter {
       queueMicrotask(() => this.stdout.emit("data", `${JSON.stringify({ jsonrpc: "2.0", id: request.id, result })}\n`));
       return true;
     },
-  };
+  });
   kill = vi.fn((signal: NodeJS.Signals) => {
     this.signalCode = signal;
     return true;
@@ -57,6 +64,8 @@ import { grokAdapter } from "../src/server/adapters/grok.js";
 describe("Grok adapter", () => {
   beforeEach(() => {
     processes.length = 0;
+    behaviour.hang = [];
+    behaviour.fail = [];
     spawnMock.mockReset();
     spawnMock.mockImplementation((_command: string, args: string[]) => {
       const child = new FakeProcess();
@@ -105,6 +114,43 @@ describe("Grok adapter", () => {
     expect(processes[0]?.requests.map((request) => request.method)).toEqual([
       "initialize", "authenticate", "session/new", "session/set_model", "session/prompt",
     ]);
+    expect(processes[0]?.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("terminates the agent and rejects when cancelled during the handshake", async () => {
+    behaviour.hang = ["authenticate"];
+    const controller = new AbortController();
+    const run = grokAdapter.run({
+      cwd: "/tmp/project", model: "grok-fast", prompt: "x", signal: controller.signal,
+      onReady: vi.fn(), waitForStart: async () => {}, onDelta: vi.fn(),
+    });
+    await vi.waitFor(() => expect(processes[0]?.requests.at(-1)?.method).toBe("authenticate"));
+    controller.abort(new Error("Benchmark cancelled."));
+
+    await expect(run).rejects.toMatchObject({ name: "AbortError" });
+    expect(processes[0]?.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(processes[0]?.requests.some((request) => request.method === "session/cancel")).toBe(false);
+  });
+
+  it("terminates the agent when the probe handshake fails", async () => {
+    behaviour.fail = ["authenticate"];
+
+    const result = await grokAdapter.probe();
+
+    expect(result).toMatchObject({ installed: true, authenticated: false, message: expect.stringContaining("not signed in") });
+    expect(processes[1]?.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("fails pending requests when stdin errors instead of crashing", async () => {
+    behaviour.hang = ["authenticate"];
+    const run = grokAdapter.run({
+      cwd: "/tmp/project", model: "grok-fast", prompt: "x", signal: new AbortController().signal,
+      onReady: vi.fn(), waitForStart: async () => {}, onDelta: vi.fn(),
+    });
+    await vi.waitFor(() => expect(processes[0]?.requests.at(-1)?.method).toBe("authenticate"));
+    processes[0].stdin.emit("error", new Error("write EPIPE"));
+
+    await expect(run).rejects.toThrow("write EPIPE");
     expect(processes[0]?.kill).toHaveBeenCalledWith("SIGTERM");
   });
 

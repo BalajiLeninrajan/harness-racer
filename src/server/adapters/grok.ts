@@ -48,17 +48,30 @@ class GrokAcpConnection {
     this.child.stdout.on("data", (chunk: string) => this.acceptChunk(chunk));
     this.child.stderr.on("data", (chunk: string) => { this.stderr = (this.stderr + chunk).slice(-16_384); });
     this.child.once("error", (error) => this.failAll(error));
+    // A write that lands after the child closed its read end raises EPIPE on
+    // stdin; without a listener that is an uncaught exception.
+    this.child.stdin.on("error", (error) => this.failAll(error));
     this.child.once("close", (code, signal) => {
       this.closed = true;
       this.failAll(new Error(`Grok ACP exited with ${signal ? `signal ${signal}` : `code ${code}`}${this.stderr.trim() ? `: ${this.stderr.trim()}` : ""}`));
     });
   }
 
-  request(method: string, params: unknown): Promise<unknown> {
+  request(method: string, params: unknown, signal?: AbortSignal): Promise<unknown> {
     if (this.closed) return Promise.reject(new Error("Grok ACP process is closed"));
+    if (signal?.aborted) return Promise.reject(abortError());
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { method, resolve, reject });
+      const onAbort = () => {
+        this.pending.delete(id);
+        reject(abortError());
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+      const settle = <T>(fn: (value: T) => void) => (value: T) => {
+        signal?.removeEventListener("abort", onAbort);
+        fn(value);
+      };
+      this.pending.set(id, { method, resolve: settle(resolve), reject: settle(reject) });
       this.write({ jsonrpc: "2.0", id, method, params });
     });
   }
@@ -143,26 +156,26 @@ function modelsFromSession(session: unknown): { models: ModelOption[]; defaultMo
   return { models, defaultModel: current ?? models[0]?.id };
 }
 
-async function startSession(cwd: string, onNotification: (method: string, params: unknown) => void) {
-  const connection = new GrokAcpConnection(cwd, onNotification);
+async function openSession(connection: GrokAcpConnection, cwd: string, signal?: AbortSignal) {
   await connection.request("initialize", {
     protocolVersion: 1,
     clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
     clientInfo: { name: "harness-racer", version: "0.1.0" },
-  });
-  await connection.request("authenticate", { methodId: process.env.XAI_API_KEY?.trim() ? "xai.api_key" : "cached_token" });
-  const session = await connection.request("session/new", { cwd, mcpServers: [] });
+  }, signal);
+  await connection.request("authenticate", { methodId: process.env.XAI_API_KEY?.trim() ? "xai.api_key" : "cached_token" }, signal);
+  const session = await connection.request("session/new", { cwd, mcpServers: [] }, signal);
   const sessionId = recordFrom(session)?.sessionId;
   if (typeof sessionId !== "string") throw new Error("Grok ACP session/new returned no sessionId");
-  return { connection, session, sessionId };
+  return { session, sessionId };
 }
 
 async function discoverGrokModels(): Promise<{ models: ModelOption[]; defaultModel?: string }> {
-  const started = await startSession(process.cwd(), () => {});
+  const connection = new GrokAcpConnection(process.cwd(), () => {});
   try {
+    const started = await openSession(connection, process.cwd());
     return modelsFromSession(started.session);
   } finally {
-    started.connection.terminate();
+    connection.terminate();
   }
 }
 
@@ -178,7 +191,7 @@ async function runGrok(input: AdapterRunInput): Promise<AdapterRunOutput> {
     }
   };
   try {
-    const started = await startSession(input.cwd, (method, params) => {
+    connection = new GrokAcpConnection(input.cwd, (method, params) => {
       if (method !== "session/update") return;
       const notification = recordFrom(params);
       if (sessionId && notification?.sessionId !== sessionId) return;
@@ -186,20 +199,22 @@ async function runGrok(input: AdapterRunInput): Promise<AdapterRunOutput> {
       const content = recordFrom(update?.content);
       if (update?.sessionUpdate === "agent_message_chunk" && content?.type === "text" && typeof content.text === "string" && content.text) input.onDelta(content.text);
     });
-    connection = started.connection;
-    sessionId = started.sessionId;
-    const current = recordFrom(recordFrom(started.session)?.models)?.currentModelId;
-    if (current !== input.model) await connection.request("session/set_model", { sessionId, modelId: input.model });
+    // Registered before the first handshake byte, so a cancel or timeout
+    // reaches a grok that stalls in authenticate.
     const onAbort = () => {
-      connection?.notify("session/cancel", { sessionId });
+      if (sessionId) connection?.notify("session/cancel", { sessionId });
       connection?.terminate();
     };
     input.signal.addEventListener("abort", onAbort, { once: true });
-    signalReady();
-    await input.waitForStart();
-    if (input.signal.aborted) throw abortError();
     try {
-      const result = await connection.request("session/prompt", { sessionId, prompt: [{ type: "text", text: input.prompt }] });
+      const started = await openSession(connection, input.cwd, input.signal);
+      sessionId = started.sessionId;
+      const current = recordFrom(recordFrom(started.session)?.models)?.currentModelId;
+      if (current !== input.model) await connection.request("session/set_model", { sessionId, modelId: input.model }, input.signal);
+      signalReady();
+      await input.waitForStart();
+      if (input.signal.aborted) throw abortError();
+      const result = await connection.request("session/prompt", { sessionId, prompt: [{ type: "text", text: input.prompt }] }, input.signal);
       const nativeOutputTokens = outputTokensFrom(result);
       return nativeOutputTokens === undefined ? {} : { nativeOutputTokens };
     } finally {

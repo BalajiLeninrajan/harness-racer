@@ -12,7 +12,7 @@ vi.mock("node:fs", () => ({
 }));
 
 type FakeChild = EventEmitter & {
-  stdin: { write: ReturnType<typeof vi.fn> };
+  stdin: EventEmitter & { write: ReturnType<typeof vi.fn> };
   stdout: EventEmitter & { setEncoding: () => void };
   stderr: EventEmitter & { setEncoding: () => void };
   exitCode: number | null;
@@ -25,7 +25,7 @@ const MODEL_LIST = "gemini-3.8-flash-high\tGemini 3.8 Flash (High)\ngemini-3.8-f
 
 function commandProcess(stdout: string, stderr = "", code = 0): FakeChild {
   const child = new EventEmitter() as FakeChild;
-  child.stdin = { write: vi.fn() };
+  child.stdin = Object.assign(new EventEmitter(), { write: vi.fn() });
   child.stdout = Object.assign(new EventEmitter(), { setEncoding: () => {} });
   child.stderr = Object.assign(new EventEmitter(), { setEncoding: () => {} });
   child.exitCode = code;
@@ -53,7 +53,7 @@ function sessionProcess(options: { failTurn?: boolean } = {}): FakeChild {
     return true;
   });
   const emit = (event: Record<string, unknown>) => child.stdout.emit("data", `${JSON.stringify(event)}\n`);
-  child.stdin = {
+  child.stdin = Object.assign(new EventEmitter(), {
     write: vi.fn((line: string) => {
       const message = JSON.parse(line) as Record<string, unknown>;
       child.messages.push(message);
@@ -75,7 +75,7 @@ function sessionProcess(options: { failTurn?: boolean } = {}): FakeChild {
       });
       return true;
     }),
-  };
+  });
   return child;
 }
 
@@ -201,6 +201,25 @@ describe("Antigravity adapter", () => {
       onReady, waitForStart: async () => {}, onDelta: vi.fn(),
     })).rejects.toThrow(/exited with code 2: Error: unknown model/);
     expect(onReady).toHaveBeenCalledOnce();
+  });
+
+  it("fails the run when stdin errors instead of crashing the server", async () => {
+    const children: FakeChild[] = [];
+    mocks.spawn.mockImplementation(() => {
+      const child = sessionProcess();
+      child.stdin.write = vi.fn(() => {
+        queueMicrotask(() => child.stdin.emit("error", new Error("write EPIPE")));
+        return true;
+      });
+      children.push(child);
+      return child;
+    });
+    const adapter = await loadAdapter();
+    await expect(adapter.run({
+      cwd: "/tmp/run", model: "gemini-3.8-flash-low", prompt: "x", signal: new AbortController().signal,
+      onReady: vi.fn(), waitForStart: async () => {}, onDelta: vi.fn(),
+    })).rejects.toThrow("write EPIPE");
+    expect(children[0]?.kill).toHaveBeenCalledWith("SIGTERM");
   });
 
   it("rejects an already-aborted run without spawning", async () => {
