@@ -28,6 +28,10 @@
 
 .brand-logo { display: block; flex: 0 0 auto; object-fit: contain; filter: invert(92%) sepia(8%) saturate(558%) hue-rotate(191deg) brightness(99%) contrast(93%); opacity: .92; }
 
+/* The package spine paints the interactive color since 0.5.0. Here it is the
+   racer's lane color, so it keeps reading --accent. */
+:is(.competitor-card, .review-racer).cn-spine::before { background: var(--accent); }
+
 .spin { animation: spin 1s linear infinite; }
 
 /* ── Setup ──────────────────────────────────────────────────────────────── */
@@ -77,7 +81,7 @@
 /* ── Review ─────────────────────────────────────────────────────────────── */
 
 .section-intro { align-items: flex-end; }
-.starting-lights { flex: 0 0 auto; padding: 10px; display: flex; gap: 8px; border-radius: 999px; background: var(--base); box-shadow: var(--neu-inset); }
+.starting-lights { flex: 0 0 auto; padding: 10px; display: flex; gap: 8px; border-radius: 999px; background: var(--cn-surface-sunken); box-shadow: var(--neu-inset); }
 .starting-lights span { width: 22px; height: 22px; border-radius: 50%; background: var(--red); box-shadow: var(--neu-inset-soft); }
 .starting-lights span:nth-child(2) { background: var(--yellow); }
 .starting-lights span:nth-child(3) { background: var(--green); }
@@ -93,7 +97,6 @@
 
 /* ── Race ───────────────────────────────────────────────────────────────── */
 
-.race-view { scroll-margin-top: 68px; }
 .race-header { align-items: flex-end; }
 /* A lane is one panel holding one carved stream well: two elevations,
    separated by gap. "Running" shows on each channel that can carry it: the
