@@ -28,10 +28,6 @@
 
 .brand-logo { display: block; flex: 0 0 auto; object-fit: contain; filter: invert(92%) sepia(8%) saturate(558%) hue-rotate(191deg) brightness(99%) contrast(93%); opacity: .92; }
 
-/* The package spine paints the interactive color since 0.5.0. Here it is the
-   racer's lane color, so it keeps reading --accent. */
-:is(.competitor-card, .review-racer).cn-spine::before { background: var(--accent); }
-
 .spin { animation: spin 1s linear infinite; }
 
 /* ── Setup ──────────────────────────────────────────────────────────────── */
@@ -69,6 +65,9 @@
 .racer-picker-sidebar > :not([aria-pressed="true"]):active { transform: translateY(1px); box-shadow: var(--neu-inset-soft); }
 /* 9px above and below a 46px input fills the 64px row exactly. */
 .racer-picker-search { grid-column: 2; grid-row: 1; padding: 9px 12px; border-bottom: 1px solid var(--surface-0); }
+/* The list under this input is always open, so it drops the chevron and the
+   end padding the package gives a combobox input. */
+.racer-picker-search .input { padding-inline-end: var(--space-4); background-image: none; }
 .racer-picker-options { grid-column: 2; grid-row: 2; min-height: 0; overflow-y: auto; padding: 7px; scrollbar-color: var(--surface-2) transparent; }
 .racer-picker-pane-label { height: 32px; padding: 0 9px; }
 .racer-picker-option { width: 100%; min-height: 54px; padding: 7px 9px; display: flex; align-items: center; gap: 9px; color: var(--text); border: 0; border-radius: 10px; background: transparent; text-align: left; cursor: pointer; }

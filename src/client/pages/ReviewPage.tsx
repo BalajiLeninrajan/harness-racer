@@ -56,7 +56,7 @@ export function ReviewPage({ competitors, providers, mode, preset, notice, canSt
         </div>
         <div className="well cn-bg-well cn-p-8 cn-divide">
           {competitors.map((competitor, index) => (
-            <div key={competitor.id} className="review-racer cn-spine" style={{ "--accent": competitor.color } as CSSProperties}>
+            <div key={competitor.id} className="review-racer" style={{ "--accent": competitor.color } as CSSProperties}>
               <span className="mark">{index + 1}</span>
               <ModelMark harness={competitor.harness} model={competitor.model} />
               <div className="review-racer-model cn-min-0 cn-stack cn-gap-4"><strong className="cn-truncate">{providerMap.get(competitor.harness)?.models.find((model) => model.id === competitor.model)?.label ?? competitor.model}</strong><span className="cn-meta cn-truncate">{modelLabName(competitor.model, competitor.harness)} · via {HARNESS_LABELS[competitor.harness]}</span></div>
