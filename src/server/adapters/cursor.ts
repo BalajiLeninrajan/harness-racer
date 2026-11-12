@@ -195,6 +195,9 @@ class CursorAcpConnection {
       this.stderr = (this.stderr + chunk).slice(-16_384);
     });
     this.child.once("error", (error) => this.failAll(error));
+    // A write that lands after the child closed its read end raises EPIPE on
+    // stdin; without a listener that is an uncaught exception.
+    this.child.stdin.on("error", (error) => this.failAll(error));
     this.child.once("close", (code, signal) => {
       this.closed = true;
       const detail = stripAnsi(this.stderr).trim();

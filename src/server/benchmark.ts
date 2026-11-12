@@ -10,7 +10,7 @@ import type {
   ServerEvent,
   WorkloadId,
 } from "../shared/types.js";
-import type { HarnessAdapter } from "./adapters/types.js";
+import type { AdapterRunOutput, HarnessAdapter } from "./adapters/types.js";
 import { countNormalizedTokens, streamAnomalyMessage, summarizeResults } from "./metrics.js";
 import { validateOutput, workloads } from "./workloads.js";
 
@@ -21,6 +21,35 @@ const presetRuns: Record<SamplePreset, { warmups: number; measured: number }> = 
 };
 
 type Emit = (event: ServerEvent) => void;
+
+const RUN_TIMEOUT_MS = 120_000;
+// Long enough for every adapter to have sent SIGKILL to a child that ignored
+// SIGTERM (Codex: up to 800 ms interrupt, then 1 s; the rest: 1.5 s).
+const TEARDOWN_GRACE_MS = 2_000;
+
+// Settles with the promise, or rejects with the signal's reason as soon as it
+// aborts, so nothing in runOne keeps waiting on an adapter that ignores it.
+function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    if (signal.aborted) onAbort();
+    else signal.addEventListener("abort", onAbort, { once: true });
+    // The promise is observed even when the signal was already aborted: the
+    // caller has started the work, and its rejection must not go unhandled.
+    promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
+}
+
+// Resolves once the promise settles, or after the grace period if it does not.
+function settledWithin(promise: Promise<unknown>, graceMs: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, graceMs);
+    promise.catch(() => undefined).finally(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+}
 
 interface RunOneInput {
   competitor: Competitor;
@@ -37,7 +66,13 @@ interface RunOneInput {
 async function runOne(input: RunOneInput): Promise<RunResult> {
   const { competitor, workload, sample, warmup, adapter, parentSignal, emit } = input;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(new Error("Run timed out after 120 seconds.")), 120_000);
+  // One budget for setup and a fresh one for the run itself, so a slow lane's
+  // prep does not eat a fast lane's run time. Neither covers the wait at the
+  // parallel start barrier: see waitForStart.
+  let timeout = setTimeout(
+    () => controller.abort(new Error(`Harness was not ready to start within ${RUN_TIMEOUT_MS / 1000} seconds.`)),
+    RUN_TIMEOUT_MS,
+  );
   const abort = () => controller.abort(parentSignal.reason);
   parentSignal.addEventListener("abort", abort, { once: true });
 
@@ -49,27 +84,49 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
   let lastDeltaAt = 0;
   let output = "";
   let deltaCount = 0;
+  let readySignalled = false;
+  let settled = false;
+  // Adapters keep running for a while after the lane gave up on them (a
+  // timed-out or cancelled child gets a grace period before SIGKILL, and
+  // every adapter signals ready from its catch block), and nothing they
+  // report then belongs to this lane, or to a benchmark started since.
+  const closed = () => settled || controller.signal.aborted;
+  let adapterRun: Promise<AdapterRunOutput> | undefined;
 
   emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "starting" });
 
   try {
-    const adapterResult = await adapter.run({
+    adapterRun = adapter.run({
       model: competitor.model,
       prompt: workload.prompt,
       cwd: workspace,
       signal: controller.signal,
       onReady: () => {
+        // A second call from an adapter must not count twice toward the
+        // parallel start barrier.
+        if (readySignalled || closed()) return;
+        readySignalled = true;
         readyAt = performance.now();
         emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "ready" });
         input.onReady?.();
       },
       waitForStart: async () => {
-        if (input.startGate) await input.startGate;
+        // The barrier opens when the last lane is ready or the first lane
+        // fails, and a lane stuck in setup fails on its own setup timer, so a
+        // ready lane carries no timer of its own while it waits here. Its
+        // failure would otherwise be reported as the harness not being ready.
+        clearTimeout(timeout);
+        if (input.startGate) await untilAborted(input.startGate, controller.signal);
+        if (controller.signal.aborted) throw controller.signal.reason;
         startedAt = performance.now();
+        timeout = setTimeout(
+          () => controller.abort(new Error(`Run timed out after ${RUN_TIMEOUT_MS / 1000} seconds.`)),
+          RUN_TIMEOUT_MS,
+        );
         emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "running" });
       },
       onDelta: (text) => {
-        if (!text) return;
+        if (!text || closed()) return;
         const now = performance.now();
         if (firstDeltaAt === 0) firstDeltaAt = now;
         lastDeltaAt = now;
@@ -88,7 +145,11 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
         });
       },
     });
+    const adapterResult = await untilAborted(adapterRun, controller.signal);
 
+    // An adapter can resolve after its process was cut short by the abort, so
+    // a resolved run is only complete if nothing aborted it in the meantime.
+    if (controller.signal.aborted) throw controller.signal.reason;
     if (firstDeltaAt === 0 || lastDeltaAt === 0) {
       throw new Error("The agent completed without streaming visible text.");
     }
@@ -129,9 +190,21 @@ async function runOne(input: RunOneInput): Promise<RunResult> {
     emit({ type: "run.status", competitorId: competitor.id, workload: workload.id, sample, warmup, status: "complete" });
     emit({ type: "run.complete", result });
     return result;
+  } catch (error) {
+    // Adapters rethrow their own fixed "cancelled" error; the reason on the
+    // signal (timeout or cancel message) is the one worth reporting.
+    if (controller.signal.aborted) throw controller.signal.reason;
+    throw error;
   } finally {
+    settled = true;
     clearTimeout(timeout);
     parentSignal.removeEventListener("abort", abort);
+    // A lane given up on (timeout or cancel) rejected before its adapter did,
+    // and the adapter is still interrupting and killing its child. The next
+    // lane or heat would otherwise be measured while sharing the machine with
+    // that dying process, and the workspace it runs in would be deleted under
+    // it. Wait for the adapter to settle, but not on one that never does.
+    if (adapterRun) await settledWithin(adapterRun, TEARDOWN_GRACE_MS);
     await rm(workspace, { recursive: true, force: true }).catch(() => undefined);
   }
 }
@@ -171,27 +244,24 @@ async function runParallel(
         // Never strand healthy racers behind the readiness barrier when one
         // process fails during setup.
         release();
+        // A cancelled lane is not a lane error; the benchmark as a whole is
+        // cancelled once every lane has settled.
+        if (!signal.aborted) {
+          emit({
+            type: "run.error",
+            competitorId: competitor.id,
+            workload: workload.id,
+            sample,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
         throw error;
       });
     });
 
   const settled = await Promise.allSettled(tasks);
-  const results: RunResult[] = [];
-  settled.forEach((outcome, index) => {
-    if (outcome.status === "fulfilled") {
-      results.push(outcome.value);
-      return;
-    }
-    const competitor = competitors[index];
-    emit({
-      type: "run.error",
-      competitorId: competitor.id,
-      workload: workload.id,
-      sample,
-      message: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
-    });
-  });
-  return results;
+  if (signal.aborted) throw signal.reason;
+  return settled.flatMap((outcome) => (outcome.status === "fulfilled" ? [outcome.value] : []));
 }
 
 async function runSequential(

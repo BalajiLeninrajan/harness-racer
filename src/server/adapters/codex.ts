@@ -132,7 +132,9 @@ class CodexRpcClient {
     child.stderr.resume();
     child.stdin.on("error", (error) => this.terminate(error));
     child.once("error", (error) => this.terminate(error));
-    child.once("exit", (code, signal) => {
+    // "close" rather than "exit": exit can fire before readline delivers the
+    // last stdout line, which is where a dying app-server reports why.
+    child.once("close", (code, signal) => {
       if (this.closed) return;
       const detail = code === null ? `signal ${signal ?? "unknown"}` : `code ${code}`;
       this.terminate(new Error(`Codex app-server exited with ${detail}`));

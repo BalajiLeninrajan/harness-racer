@@ -53,7 +53,10 @@ export function attachWebSockets(server: HttpServer): WebSocketServer {
   server.on("upgrade", (request, socket, head) => {
     const host = request.headers.host;
     const origin = request.headers.origin;
-    if (request.url !== "/ws" || (origin && host && new URL(origin).host !== host)) {
+    // Browsers send "Origin: null" for sandboxed frames and file:// pages;
+    // an origin that does not parse is treated as a mismatch, not a crash.
+    const originMatches = !origin || !host || (URL.canParse(origin) && new URL(origin).host === host);
+    if (request.url !== "/ws" || !originMatches) {
       socket.destroy();
       return;
     }
