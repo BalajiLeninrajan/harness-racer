@@ -64,7 +64,7 @@ main { display: grid; align-content: center; overflow: hidden; }
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: radial-gradient(75% 130% at 8% 50%, var(--base) 26%, color-mix(in srgb, var(--base) 62%, transparent) 62%, transparent);
+  background: radial-gradient(75% 130% at 8% 50%, var(--cn-surface-page) 26%, color-mix(in srgb, var(--cn-surface-page) 62%, transparent) 62%, transparent);
   pointer-events: none;
 }
 

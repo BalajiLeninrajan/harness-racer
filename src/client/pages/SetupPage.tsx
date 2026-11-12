@@ -47,7 +47,7 @@ export function SetupPage({
             <div className="well cn-bg-well cn-p-8">
               <div className="cn-divide">
                 {competitors.map((competitor) => (
-                  <div className="competitor-card cn-spine" key={competitor.id} style={{ "--accent": competitor.color } as CSSProperties}>
+                  <div className="competitor-card" key={competitor.id} style={{ "--accent": competitor.color } as CSSProperties}>
                     <RacerPicker providers={providers} harness={competitor.harness} model={competitor.model} onChange={(choice) => onSelectionChange(competitor.id, choice)} />
                     <button
                       className={`btn is-icon cn-tone-red remove-button${competitors.length <= 2 ? " is-hidden" : ""}`}
